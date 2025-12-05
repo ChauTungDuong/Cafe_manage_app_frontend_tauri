@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card } from "./ui/card";
 import { Button } from "./ui/button";
 import { ImageWithFallback } from "./figma/ImageWithFallback";
@@ -9,6 +9,8 @@ import {
   ShoppingCart,
   Loader2,
   QrCode,
+  CheckCircle2,
+  XCircle,
 } from "lucide-react";
 import { ScrollArea } from "./ui/scroll-area";
 import { Separator } from "./ui/separator";
@@ -20,7 +22,13 @@ import {
   SelectValue,
 } from "./ui/select";
 import { Input } from "./ui/input";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "./ui/dialog";
 import {
   itemsApi,
   tablesApi,
@@ -28,6 +36,7 @@ import {
   ordersApi,
   paymentsApi,
 } from "../lib/api";
+import { usePaymentWebSocket } from "../lib/usePaymentWebSocket";
 import type { Item, Table, Tax } from "../types/api";
 
 interface OrderItem extends Item {
@@ -71,12 +80,65 @@ export function SalesPOS({ currentUser }: SalesPOSProps) {
   const [orderCode, setOrderCode] = useState<string>("");
   const [orderId, setOrderId] = useState<string>(""); // Store order ID for payment
 
-  // Load data on mount
-  useEffect(() => {
-    loadItems();
-    loadTables();
-    loadTaxes();
+  // Payment result dialog state
+  const [showPaymentResultDialog, setShowPaymentResultDialog] = useState(false);
+  const [paymentResult, setPaymentResult] = useState<{
+    success: boolean;
+    message: string;
+    orderCode: string;
+    total: number;
+  } | null>(null);
+
+  // WebSocket enabled when showing QR payment
+  const [wsEnabled, setWsEnabled] = useState(false);
+
+  // Reset form helper
+  const resetForm = useCallback(async () => {
+    setOrder([]);
+    setSelectedTable("");
+    setDiscount(0);
+    setShowPaymentDialog(false);
+    setOrderCode("");
+    setOrderId("");
+    setQrCode("");
+    setWsEnabled(false);
+    // Reload data
+    await Promise.all([loadItems(), loadTables()]);
   }, []);
+
+  // Payment WebSocket hook - handles real-time payment notifications
+  const { checkStatusManually } = usePaymentWebSocket({
+    orderCode: orderCode,
+    enabled: wsEnabled && paymentMethod === "QR" && !!qrCode,
+    onPaymentSuccess: async (data) => {
+      console.log("🎉 Payment success from WebSocket!", data);
+      setWsEnabled(false);
+      setPaymentResult({
+        success: true,
+        message: "Thanh toán thành công!",
+        orderCode: data.orderCode,
+        total: total,
+      });
+      setShowPaymentDialog(false);
+      setShowPaymentResultDialog(true);
+      await resetForm();
+    },
+    onPaymentFailed: (data) => {
+      console.log("❌ Payment failed from WebSocket", data);
+      setWsEnabled(false);
+      setPaymentResult({
+        success: false,
+        message: data.message || "Thanh toán thất bại!",
+        orderCode: data.orderCode,
+        total: total,
+      });
+      setShowPaymentDialog(false);
+      setShowPaymentResultDialog(true);
+    },
+    onError: (error) => {
+      console.error("WebSocket error:", error);
+    },
+  });
 
   const loadItems = async () => {
     setIsLoadingItems(true);
@@ -121,6 +183,13 @@ export function SalesPOS({ currentUser }: SalesPOSProps) {
       setIsLoadingTaxes(false);
     }
   };
+
+  // Load data on mount
+  useEffect(() => {
+    loadItems();
+    loadTables();
+    loadTaxes();
+  }, []);
 
   // Get unique categories from items
   const categories = [
@@ -178,17 +247,20 @@ export function SalesPOS({ currentUser }: SalesPOSProps) {
   };
 
   // Calculate totals
+  // Logic: Thuế tính trên giá gốc, sau đó mới áp dụng giảm giá
   const subtotal = order.reduce(
     (sum, item) => sum + item.price * item.quantity,
     0
   );
-  const discountAmount = (subtotal * discount) / 100;
-  const subtotalAfterDiscount = Math.max(0, subtotal - discountAmount);
   const selectedTaxData = taxes.find((t) => t.id === selectedTax);
+  // Thuế tính trên giá gốc (trước giảm giá)
   const taxAmount = selectedTaxData
-    ? (subtotalAfterDiscount * selectedTaxData.percent) / 100
+    ? (subtotal * selectedTaxData.percent) / 100
     : 0;
-  const total = subtotalAfterDiscount + taxAmount;
+  const subtotalWithTax = subtotal + taxAmount;
+  // Giảm giá áp dụng sau thuế
+  const discountAmount = (subtotalWithTax * discount) / 100;
+  const total = Math.max(0, subtotalWithTax - discountAmount);
 
   const handleCheckout = async () => {
     // Prevent duplicate calls
@@ -282,30 +354,23 @@ export function SalesPOS({ currentUser }: SalesPOSProps) {
 
       if (paymentMethod === "QR" && payment.qrCode) {
         setQrCode(payment.qrCode);
+        // Enable WebSocket for real-time payment notification
+        setWsEnabled(true);
+        console.log("🔌 WebSocket enabled for QR payment monitoring");
       } else {
-        // Payment success
-        alert(
-          `Thanh toán thành công!\nMã đơn hàng: ${
-            payment.orderCode
-          }\nPhương thức: ${
-            paymentMethod === "cash"
-              ? "Tiền mặt"
-              : paymentMethod === "card"
-              ? "Thẻ"
-              : "QR"
-          }\nTổng tiền: ${total.toLocaleString("vi-VN")}đ`
-        );
+        // Payment success for cash/card
+        // Show success dialog for cash/card payments
+        setPaymentResult({
+          success: true,
+          message: "Thanh toán thành công!",
+          orderCode: payment.orderCode || orderCode,
+          total: total,
+        });
+        setShowPaymentDialog(false);
+        setShowPaymentResultDialog(true);
 
         // Reset form
-        setOrder([]);
-        setSelectedTable("");
-        setDiscount(0);
-        setShowPaymentDialog(false);
-        setOrderCode("");
-        setOrderId("");
-
-        // Reload data
-        await Promise.all([loadItems(), loadTables()]);
+        await resetForm();
       }
     } catch (err: any) {
       const message =
@@ -330,23 +395,40 @@ export function SalesPOS({ currentUser }: SalesPOSProps) {
 
     setIsProcessing(true);
 
-    alert(
-      `Thanh toán QR thành công!\nMã đơn hàng: ${orderCode}\nTổng tiền: ${total.toLocaleString(
-        "vi-VN"
-      )}đ`
-    );
+    // Check payment status first
+    try {
+      const isPaid = await checkStatusManually();
+      if (isPaid) {
+        // WebSocket callback will handle success
+        setIsProcessing(false);
+        return;
+      }
 
-    // Reset form
-    setOrder([]);
-    setSelectedTable("");
-    setDiscount(0);
-    setShowPaymentDialog(false);
-    setOrderCode("");
-    setOrderId("");
-    setQrCode("");
+      // Manual confirmation - show success
+      setPaymentResult({
+        success: true,
+        message: "Thanh toán QR thành công!",
+        orderCode: orderCode,
+        total: total,
+      });
+      setShowPaymentDialog(false);
+      setShowPaymentResultDialog(true);
 
-    // Reload data
-    await Promise.all([loadItems(), loadTables()]);
+      // Reset form
+      await resetForm();
+    } catch (err) {
+      console.error("Error checking payment status:", err);
+      // Still allow manual confirmation
+      setPaymentResult({
+        success: true,
+        message: "Thanh toán QR thành công!",
+        orderCode: orderCode,
+        total: total,
+      });
+      setShowPaymentDialog(false);
+      setShowPaymentResultDialog(true);
+      await resetForm();
+    }
 
     setIsProcessing(false);
   };
@@ -405,7 +487,10 @@ export function SalesPOS({ currentUser }: SalesPOSProps) {
                 >
                   <div className="aspect-square relative bg-gradient-to-br from-orange-50 to-amber-50">
                     <ImageWithFallback
-                      src={`https://images.unsplash.com/photo-1635090976010-d3f6dfbb1bac?w=400`}
+                      src={
+                        item.image ||
+                        `https://images.unsplash.com/photo-1635090976010-d3f6dfbb1bac?w=400`
+                      }
                       alt={item.name}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                     />
@@ -578,16 +663,16 @@ export function SalesPOS({ currentUser }: SalesPOSProps) {
               <span>Tạm tính:</span>
               <span>{subtotal.toLocaleString("vi-VN")}đ</span>
             </div>
+            <div className="flex justify-between text-sm text-amber-900">
+              <span>Thuế ({selectedTaxData?.percent || 0}%):</span>
+              <span>+{taxAmount.toLocaleString("vi-VN")}đ</span>
+            </div>
             {discount > 0 && (
               <div className="flex justify-between text-sm text-green-600">
                 <span>Giảm giá ({discount}%):</span>
                 <span>-{discountAmount.toLocaleString("vi-VN")}đ</span>
               </div>
             )}
-            <div className="flex justify-between text-sm text-amber-900">
-              <span>Thuế ({selectedTaxData?.percent || 0}%):</span>
-              <span>{taxAmount.toLocaleString("vi-VN")}đ</span>
-            </div>
             <Separator className="bg-orange-200" />
             <div className="flex justify-between text-lg font-semibold text-amber-900">
               <span>Tổng cộng:</span>
@@ -619,13 +704,26 @@ export function SalesPOS({ currentUser }: SalesPOSProps) {
       </div>
 
       {/* Payment Dialog */}
-      <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
+      <Dialog
+        open={showPaymentDialog}
+        onOpenChange={(open) => {
+          // Chỉ cho phép đóng nếu không đang hiển thị QR hoặc click vào nút Hủy
+          if (!open && qrCode) {
+            // Đang hiển thị QR - không cho đóng bằng click outside
+            return;
+          }
+          setShowPaymentDialog(open);
+        }}
+      >
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <ShoppingCart className="h-5 w-5 text-orange-500" />
               Thanh toán đơn hàng
             </DialogTitle>
+            <DialogDescription className="sr-only">
+              Chọn phương thức thanh toán cho đơn hàng
+            </DialogDescription>
           </DialogHeader>
 
           {qrCode ? (
@@ -648,6 +746,13 @@ export function SalesPOS({ currentUser }: SalesPOSProps) {
                 <p className="text-sm text-gray-500">
                   Mã đơn hàng: {orderCode}
                 </p>
+
+                {/* Warning message */}
+                <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                  <p className="text-sm text-amber-700 font-medium">
+                    ⚠️ Quý khách vui lòng không thay đổi nội dung chuyển khoản
+                  </p>
+                </div>
               </div>
               <div className="flex gap-3">
                 <Button
@@ -655,6 +760,7 @@ export function SalesPOS({ currentUser }: SalesPOSProps) {
                   className="flex-1"
                   onClick={() => {
                     setQrCode("");
+                    setWsEnabled(false);
                     setShowPaymentDialog(false);
                   }}
                 >
@@ -742,6 +848,86 @@ export function SalesPOS({ currentUser }: SalesPOSProps) {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Payment Result Dialog */}
+      <Dialog
+        open={showPaymentResultDialog}
+        onOpenChange={setShowPaymentResultDialog}
+      >
+        <DialogContent className="w-[90vw] max-w-[360px] max-h-[420px] p-4 rounded-2xl flex items-center justify-center">
+          {/* Hidden title and description for accessibility */}
+          <DialogHeader className="sr-only">
+            <DialogTitle>
+              {paymentResult?.success
+                ? "Thanh toán thành công"
+                : "Thanh toán thất bại"}
+            </DialogTitle>
+            <DialogDescription>
+              {paymentResult?.success
+                ? "Đơn hàng đã được thanh toán thành công"
+                : paymentResult?.message}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="w-full">
+            {paymentResult?.success ? (
+              <div className="flex flex-col items-center gap-3">
+                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
+                  <CheckCircle2 className="h-8 w-8 text-green-500" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-800">
+                  Thanh toán thành công!
+                </h3>
+                <p className="text-sm text-gray-500">
+                  Đơn hàng đã được thanh toán
+                </p>
+                <div className="bg-gray-50 rounded-lg p-3 w-full text-center">
+                  <p className="text-xs text-gray-500">Mã đơn hàng</p>
+                  <p className="text-sm font-medium text-gray-700">
+                    {paymentResult.orderCode}
+                  </p>
+                  <p className="text-lg font-bold text-green-600 mt-1">
+                    {paymentResult.total.toLocaleString("vi-VN")}đ
+                  </p>
+                </div>
+                <Button
+                  className="w-full bg-green-500 hover:bg-green-600 text-white rounded-lg"
+                  onClick={() => {
+                    setShowPaymentResultDialog(false);
+                    setPaymentResult(null);
+                  }}
+                >
+                  Hoàn tất
+                </Button>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center gap-3">
+                <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center">
+                  <XCircle className="h-8 w-8 text-red-500" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-800">
+                  Thanh toán thất bại
+                </h3>
+                <p className="text-sm text-gray-500">
+                  {paymentResult?.message}
+                </p>
+                <p className="text-xs text-gray-400">
+                  Mã đơn hàng: {paymentResult?.orderCode}
+                </p>
+                <Button
+                  className="w-full bg-orange-500 hover:bg-orange-600 text-white rounded-lg"
+                  onClick={() => {
+                    setShowPaymentResultDialog(false);
+                    setPaymentResult(null);
+                  }}
+                >
+                  Đóng
+                </Button>
+              </div>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </div>

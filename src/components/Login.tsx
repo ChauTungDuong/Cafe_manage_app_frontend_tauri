@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
-import { Coffee, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { UserRole, User } from "../types/user";
 import { authApi } from "../lib/api";
 
@@ -77,7 +77,7 @@ export function Login({ onLogin }: LoginProps) {
           {/* Logo */}
           <div className="flex justify-center mb-6">
             <div className="bg-gradient-to-br from-orange-500 to-amber-600 p-4 rounded-2xl shadow-lg">
-              <Coffee className="h-16 w-16 text-white" strokeWidth={2} />
+              <img src="/default/AppIcon.png" alt="Cafe" className="h-16 w-16" />
             </div>
           </div>
 

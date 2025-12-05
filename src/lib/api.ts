@@ -155,7 +155,7 @@ api.interceptors.response.use(
 
         // Gọi API refresh token (gửi qua body)
         const response = await axios.post(`${BACKEND_URL}/auth/refresh`, {
-          refresh_token: refreshToken, // Backend nhận snake_case
+          refreshToken: refreshToken, // Backend nhận camelCase
         });
 
         const { access_token: newAccessToken, refresh_token: newRefreshToken } =
@@ -198,11 +198,11 @@ export interface LoginRequest {
 }
 
 export interface LoginResponse {
-  access_token: string; // Backend trả về snake_case
+  access_token: string;
   refresh_token: string;
   user: {
     id: string;
-    name: string; // Backend trả về "name" không phải "username"
+    name: string;
     email: string;
     role: "admin" | "staff";
     phone: string;
@@ -235,7 +235,7 @@ export const authApi = {
     }
 
     const response = await axios.post(`${BACKEND_URL}/auth/refresh`, {
-      refresh_token: refreshToken, // Backend nhận snake_case
+      refreshToken: refreshToken,
     });
 
     const { access_token, refresh_token: newRefreshToken } = response.data;
@@ -248,10 +248,14 @@ export const authApi = {
     return response.data;
   },
 
-  // Đăng xuất
+  // Đăng xuất (tạm ẩn API call vì backend chưa có endpoint)
   async logout(): Promise<void> {
     try {
-      await api.post("/auth/logout");
+      // TODO: Bật lại khi backend có API logout
+      // await api.post("/auth/logout");
+      console.log(
+        "Logout - clearing local tokens (API endpoint not available yet)"
+      );
     } catch (error) {
       console.error("Logout error:", error);
     } finally {
@@ -380,9 +384,28 @@ export const itemsApi = {
     return response.data;
   },
 
-  // Create single item (ADMIN, STAFF)
-  create: async (dto: CreateItemDto): Promise<Item> => {
-    const response = await api.post("/items", dto);
+  // Create single item with FormData (ADMIN, STAFF)
+  create: async (dto: CreateItemDto, imageFile?: File): Promise<Item> => {
+    const formData = new FormData();
+    formData.append("name", dto.name);
+    formData.append("category", JSON.stringify(dto.category));
+    formData.append("price", dto.price.toString());
+    formData.append("amountLeft", dto.amountLeft.toString());
+    formData.append("status", dto.status);
+
+    if (dto.description) {
+      formData.append("description", dto.description);
+    }
+
+    if (imageFile) {
+      formData.append("image", imageFile);
+    }
+
+    const response = await api.post("/items", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
     return response.data;
   },
 
@@ -394,9 +417,32 @@ export const itemsApi = {
     return response.data;
   },
 
-  // Update item (ADMIN, STAFF)
-  update: async (id: string, dto: Partial<CreateItemDto>): Promise<Item> => {
-    const response = await api.patch(`/items/${id}`, dto);
+  // Update item with FormData (ADMIN, STAFF)
+  update: async (
+    id: string,
+    dto: Partial<CreateItemDto>,
+    imageFile?: File
+  ): Promise<Item> => {
+    const formData = new FormData();
+
+    if (dto.name) formData.append("name", dto.name);
+    if (dto.price !== undefined) formData.append("price", dto.price.toString());
+    if (dto.amountLeft !== undefined)
+      formData.append("amountLeft", dto.amountLeft.toString());
+    if (dto.status) formData.append("status", dto.status);
+    if (dto.description !== undefined)
+      formData.append("description", dto.description);
+    if (dto.category) formData.append("category", JSON.stringify(dto.category));
+
+    if (imageFile) {
+      formData.append("image", imageFile);
+    }
+
+    const response = await api.patch(`/items/${id}`, formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
     return response.data;
   },
 
@@ -522,6 +568,19 @@ export const paymentsApi = {
   // Create payment (ADMIN, STAFF)
   create: async (dto: CreatePaymentDto): Promise<Payment> => {
     const response = await api.post("/payments", dto);
+    return response.data;
+  },
+
+  // Check payment status by orderCode (ADMIN, STAFF)
+  checkStatus: async (
+    orderCode: string
+  ): Promise<{
+    orderCode: string;
+    orderStatus: string;
+    isPaid: boolean;
+    payment?: Payment;
+  }> => {
+    const response = await api.get(`/payments/status/${orderCode}`);
     return response.data;
   },
 

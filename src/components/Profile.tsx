@@ -4,6 +4,9 @@ import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
+
+// Default avatar served from public/default
+const defaultAvatar = "/default/default-avatar.jpg";
 import { Badge } from "./ui/badge";
 import {
   User,
@@ -138,10 +141,7 @@ export function Profile({ user, onUpdate }: ProfileProps) {
         <Card className="md:col-span-1 p-6 rounded-2xl border-2 border-orange-100">
           <div className="flex flex-col items-center text-center space-y-4">
             <Avatar className="h-32 w-32 border-4 border-orange-100">
-              <AvatarImage
-                src={user.avatar || "/placeholder-avatar.jpg"}
-                alt={user.name}
-              />
+              <AvatarImage src={user.avatar || defaultAvatar} alt={user.name} />
               <AvatarFallback className="bg-gradient-to-br from-orange-500 to-amber-600 text-white text-3xl">
                 {user.name.charAt(0).toUpperCase()}
               </AvatarFallback>

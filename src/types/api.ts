@@ -31,6 +31,7 @@ export interface Item {
   price: number;
   amountLeft: number;
   description?: string;
+  image?: string;
   status: "available" | "out of stock" | "discontinued";
   createdAt?: string;
   updatedAt?: string;

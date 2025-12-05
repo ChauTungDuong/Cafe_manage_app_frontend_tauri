@@ -1,9 +1,18 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card } from "./ui/card";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { ImageWithFallback } from "./figma/ImageWithFallback";
-import { Plus, Edit, Trash2, Search, Loader2, Package } from "lucide-react";
+import {
+  Plus,
+  Edit,
+  Trash2,
+  Search,
+  Loader2,
+  Package,
+  Upload,
+  X,
+} from "lucide-react";
 import { Input } from "./ui/input";
 import {
   Dialog,
@@ -54,6 +63,11 @@ export function MenuManagement() {
     description: "",
     status: "available" as "available" | "out of stock" | "discontinued",
   });
+
+  // Image upload state
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string>("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Load data on mount
   useEffect(() => {
@@ -117,6 +131,10 @@ export function MenuManagement() {
         description: item.description || "",
         status: item.status,
       });
+      // Set existing image preview
+      if (item.image) {
+        setImagePreview(item.image);
+      }
     } else {
       // Add mode
       setEditingItem(null);
@@ -129,7 +147,9 @@ export function MenuManagement() {
         description: "",
         status: "available",
       });
+      setImagePreview("");
     }
+    setImageFile(null);
     setIsDialogOpen(true);
   };
 
@@ -145,6 +165,41 @@ export function MenuManagement() {
       description: "",
       status: "available",
     });
+    setImageFile(null);
+    setImagePreview("");
+  };
+
+  // Handle image file selection
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Validate file type
+      if (!file.type.startsWith("image/")) {
+        alert("Vui lòng chọn file ảnh!");
+        return;
+      }
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        alert("Kích thước ảnh không được vượt quá 5MB!");
+        return;
+      }
+      setImageFile(file);
+      // Create preview URL
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // Remove selected image
+  const handleRemoveImage = () => {
+    setImageFile(null);
+    setImagePreview(editingItem?.image || "");
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
   };
 
   const handleSave = async () => {
@@ -177,13 +232,21 @@ export function MenuManagement() {
         // Update existing item
         const updateDto = {
           name: formData.name,
+          category: {
+            name: formData.categoryName || editingItem.category?.name || "",
+          },
           price: parseFloat(formData.price),
           amountLeft: parseInt(formData.amountLeft),
           description: formData.description,
           status: formData.status,
         };
 
-        await itemsApi.update(editingItem.id, updateDto);
+        // Pass imageFile if selected (optional)
+        await itemsApi.update(
+          editingItem.id,
+          updateDto,
+          imageFile || undefined
+        );
         alert("Cập nhật sản phẩm thành công!");
       } else {
         // Create new item
@@ -198,7 +261,8 @@ export function MenuManagement() {
           status: formData.status,
         };
 
-        await itemsApi.create(createDto);
+        // Pass imageFile if selected (optional)
+        await itemsApi.create(createDto, imageFile || undefined);
         alert("Thêm sản phẩm thành công!");
       }
 
@@ -298,7 +362,7 @@ export function MenuManagement() {
                 Thêm sản phẩm
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[500px]">
+            <DialogContent className="w-[90vw] max-w-[700px] max-h-[85vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>
                   {editingItem ? "Chỉnh sửa sản phẩm" : "Thêm sản phẩm mới"}
@@ -310,142 +374,220 @@ export function MenuManagement() {
                 </DialogDescription>
               </DialogHeader>
 
-              <div className="space-y-4 py-4">
-                {/* Name */}
-                <div className="space-y-2">
-                  <Label htmlFor="name">Tên sản phẩm *</Label>
-                  <Input
-                    id="name"
-                    value={formData.name}
-                    onChange={(e) =>
-                      setFormData({ ...formData, name: e.target.value })
-                    }
-                    placeholder="VD: Cappuccino"
-                  />
-                </div>
-
-                {/* Category */}
-                <div className="space-y-2">
-                  <Label>Danh mục *</Label>
-                  {editingItem ? (
-                    // Edit mode: show current category (read-only)
+              {/* 2-column layout */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4">
+                {/* Left Column - Form Fields */}
+                <div className="space-y-4">
+                  {/* Name */}
+                  <div className="space-y-2">
+                    <Label htmlFor="name">Tên sản phẩm *</Label>
                     <Input
-                      value={editingItem.category?.name || "N/A"}
-                      disabled
-                      className="bg-gray-50"
+                      id="name"
+                      value={formData.name}
+                      onChange={(e) =>
+                        setFormData({ ...formData, name: e.target.value })
+                      }
+                      placeholder="VD: Cappuccino"
                     />
-                  ) : (
-                    // Add mode: select existing or enter new
-                    <div className="space-y-2">
-                      <Select
-                        value={formData.categoryId}
-                        onValueChange={(value: string) =>
-                          setFormData({
-                            ...formData,
-                            categoryId: value,
-                            categoryName: "",
-                          })
-                        }
-                        disabled={isLoadingCategories}
-                      >
-                        <SelectTrigger>
-                          <SelectValue
-                            placeholder={
-                              isLoadingCategories
-                                ? "Đang tải..."
-                                : "Chọn danh mục có sẵn"
-                            }
-                          />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {categories.map((cat) => (
-                            <SelectItem key={cat.id} value={cat.name}>
-                              {cat.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <p className="text-sm text-gray-500">
-                        Hoặc nhập tên danh mục mới:
-                      </p>
+                  </div>
+
+                  {/* Category */}
+                  <div className="space-y-2">
+                    <Label>Danh mục *</Label>
+                    {editingItem ? (
+                      // Edit mode: show current category (read-only)
                       <Input
-                        value={formData.categoryName}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            categoryName: e.target.value,
-                            categoryId: "",
-                          })
-                        }
-                        placeholder="VD: coffee, tea, pastry"
-                        disabled={!!formData.categoryId}
+                        value={editingItem.category?.name || "N/A"}
+                        disabled
+                        className="bg-gray-50"
                       />
-                    </div>
-                  )}
+                    ) : (
+                      // Add mode: select existing or enter new
+                      <div className="space-y-2">
+                        <Select
+                          value={formData.categoryId}
+                          onValueChange={(value: string) =>
+                            setFormData({
+                              ...formData,
+                              categoryId: value,
+                              categoryName: "",
+                            })
+                          }
+                          disabled={isLoadingCategories}
+                        >
+                          <SelectTrigger>
+                            <SelectValue
+                              placeholder={
+                                isLoadingCategories
+                                  ? "Đang tải..."
+                                  : "Chọn danh mục có sẵn"
+                              }
+                            />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {categories.map((cat) => (
+                              <SelectItem key={cat.id} value={cat.name}>
+                                {cat.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <p className="text-sm text-gray-500">
+                          Hoặc nhập tên danh mục mới:
+                        </p>
+                        <Input
+                          value={formData.categoryName}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              categoryName: e.target.value,
+                              categoryId: "",
+                            })
+                          }
+                          placeholder="VD: coffee, tea, pastry"
+                          disabled={!!formData.categoryId}
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Price */}
+                  <div className="space-y-2">
+                    <Label htmlFor="price">Giá (VND) *</Label>
+                    <Input
+                      id="price"
+                      type="number"
+                      min="0"
+                      value={formData.price}
+                      onChange={(e) =>
+                        setFormData({ ...formData, price: e.target.value })
+                      }
+                      placeholder="45000"
+                    />
+                  </div>
+
+                  {/* Stock */}
+                  <div className="space-y-2">
+                    <Label htmlFor="amountLeft">Số lượng tồn kho *</Label>
+                    <Input
+                      id="amountLeft"
+                      type="number"
+                      min="0"
+                      value={formData.amountLeft}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          amountLeft: e.target.value,
+                        })
+                      }
+                      placeholder="100"
+                    />
+                  </div>
+
+                  {/* Status */}
+                  <div className="space-y-2">
+                    <Label>Trạng thái</Label>
+                    <Select
+                      value={formData.status}
+                      onValueChange={(value: any) =>
+                        setFormData({ ...formData, status: value })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="available">✅ Còn hàng</SelectItem>
+                        <SelectItem value="out of stock">
+                          ⚠️ Hết hàng
+                        </SelectItem>
+                        <SelectItem value="discontinued">
+                          🚫 Ngừng bán
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Description */}
+                  <div className="space-y-2">
+                    <Label htmlFor="description">Mô tả</Label>
+                    <Textarea
+                      id="description"
+                      value={formData.description}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          description: e.target.value,
+                        })
+                      }
+                      placeholder="Mô tả sản phẩm..."
+                      rows={3}
+                    />
+                  </div>
                 </div>
 
-                {/* Price */}
-                <div className="space-y-2">
-                  <Label htmlFor="price">Giá (VND) *</Label>
-                  <Input
-                    id="price"
-                    type="number"
-                    min="0"
-                    value={formData.price}
-                    onChange={(e) =>
-                      setFormData({ ...formData, price: e.target.value })
-                    }
-                    placeholder="45000"
-                  />
-                </div>
+                {/* Right Column - Image Upload */}
+                <div className="space-y-4">
+                  <Label>Ảnh sản phẩm</Label>
 
-                {/* Stock */}
-                <div className="space-y-2">
-                  <Label htmlFor="amountLeft">Số lượng tồn kho *</Label>
-                  <Input
-                    id="amountLeft"
-                    type="number"
-                    min="0"
-                    value={formData.amountLeft}
-                    onChange={(e) =>
-                      setFormData({ ...formData, amountLeft: e.target.value })
-                    }
-                    placeholder="100"
-                  />
-                </div>
+                  {/* Image Preview */}
+                  <div className="relative aspect-square w-full max-w-[180px] mx-auto rounded-xl overflow-hidden border-2 border-orange-200 bg-gray-50">
+                    {imagePreview ? (
+                      <>
+                        <img
+                          src={imagePreview}
+                          alt="Preview"
+                          className="w-full h-full object-cover"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleRemoveImage}
+                          className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors shadow-lg"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </>
+                    ) : (
+                      <div className="w-full h-full flex flex-col items-center justify-center text-gray-400">
+                        <Package className="h-12 w-12 mb-2" />
+                        <span className="text-sm">Chưa có ảnh</span>
+                      </div>
+                    )}
+                  </div>
 
-                {/* Status */}
-                <div className="space-y-2">
-                  <Label>Trạng thái</Label>
-                  <Select
-                    value={formData.status}
-                    onValueChange={(value: any) =>
-                      setFormData({ ...formData, status: value })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="available">✅ Còn hàng</SelectItem>
-                      <SelectItem value="out of stock">⚠️ Hết hàng</SelectItem>
-                      <SelectItem value="discontinued">🚫 Ngừng bán</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Description */}
-                <div className="space-y-2">
-                  <Label htmlFor="description">Mô tả</Label>
-                  <Textarea
-                    id="description"
-                    value={formData.description}
-                    onChange={(e) =>
-                      setFormData({ ...formData, description: e.target.value })
-                    }
-                    placeholder="Mô tả sản phẩm..."
-                    rows={3}
-                  />
+                  {/* File Input */}
+                  <div className="flex flex-col items-center gap-2">
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageChange}
+                      className="hidden"
+                      id="image-upload"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="flex items-center gap-2"
+                    >
+                      <Upload className="h-4 w-4" />
+                      {imageFile
+                        ? "Đổi ảnh"
+                        : imagePreview
+                        ? "Thay ảnh"
+                        : "Chọn ảnh"}
+                    </Button>
+                    {imageFile && (
+                      <span className="text-xs text-gray-500 truncate max-w-[150px] text-center">
+                        {imageFile.name}
+                      </span>
+                    )}
+                    <p className="text-xs text-gray-400 text-center">
+                      JPG, PNG, GIF (max 5MB)
+                    </p>
+                  </div>
                 </div>
               </div>
 
@@ -455,7 +597,7 @@ export function MenuManagement() {
                 </div>
               )}
 
-              <div className="flex gap-3">
+              <div className="flex gap-3 pt-4 border-t">
                 <Button
                   variant="outline"
                   className="flex-1"
@@ -556,7 +698,10 @@ export function MenuManagement() {
                 >
                   <div className="aspect-square relative bg-gradient-to-br from-orange-50 to-amber-50">
                     <ImageWithFallback
-                      src={`https://images.unsplash.com/photo-1635090976010-d3f6dfbb1bac?w=400`}
+                      src={
+                        item.image ||
+                        `https://images.unsplash.com/photo-1635090976010-d3f6dfbb1bac?w=400`
+                      }
                       alt={item.name}
                       className="w-full h-full object-cover"
                     />

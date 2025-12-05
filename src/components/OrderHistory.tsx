@@ -122,6 +122,17 @@ export function OrderHistory() {
     }
   };
 
+  // Helper to format dates safely
+  const formatDateTime = (value?: string | null) => {
+    try {
+      const d = value ? new Date(value) : null;
+      if (d && !isNaN(d.getTime())) return d.toLocaleString("vi-VN");
+    } catch (e) {
+      /* ignore */
+    }
+    return "-";
+  };
+
   // Filter orders by search term
   const filteredOrders = orders.filter((order) => {
     const matchesSearch =
@@ -277,9 +288,7 @@ export function OrderHistory() {
                         <div>
                           <span className="text-amber-600">Ngày: </span>
                           <span className="text-amber-900">
-                            {new Date(order.createdAt).toLocaleDateString(
-                              "vi-VN"
-                            )}
+                            {formatDateTime(order.createdAt)}
                           </span>
                         </div>
                       </div>
@@ -307,7 +316,14 @@ export function OrderHistory() {
 
       {/* Order Detail Dialog */}
       <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
-        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+        <DialogContent
+          className="mx-auto overflow-y-auto"
+          style={{
+            width: "min(700px, 90vw)",
+            maxWidth: "700px",
+            maxHeight: "80vh",
+          }}
+        >
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Receipt className="h-5 w-5 text-orange-500" />
@@ -409,9 +425,9 @@ export function OrderHistory() {
                                 {getPaymentMethodLabel(payment.method)}
                               </p>
                               <p className="text-sm text-green-600">
-                                {new Date(payment.createdAt).toLocaleString(
-                                  "vi-VN"
-                                )}
+                                {formatDateTime(payment.createdAt) !== "-"
+                                  ? formatDateTime(payment.createdAt)
+                                  : formatDateTime(selectedOrder?.createdAt)}
                               </p>
                             </div>
                             <p className="text-lg font-bold text-green-800">

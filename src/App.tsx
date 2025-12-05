@@ -1,4 +1,8 @@
 import { useState, useEffect } from "react";
+
+// Assets moved to `public/default` — reference via absolute public paths
+const defaultAvatar = "/default/default-avatar.jpg";
+const appIcon = "/default/AppIcon.png";
 import { Login } from "./components/Login";
 import { SalesPOS } from "./components/SalesPOS";
 import { MenuManagement } from "./components/MenuManagement";
@@ -9,7 +13,6 @@ import { OrderHistory } from "./components/OrderHistory";
 import { SystemSettings } from "./components/SystemSettings";
 import { Profile } from "./components/Profile";
 import {
-  Coffee,
   ShoppingCart,
   UtensilsCrossed,
   LayoutGrid,
@@ -61,7 +64,9 @@ export default function App() {
   const handleLogin = (role: UserRole, user: User) => {
     setIsLoggedIn(true);
     setUserRole(role);
-    setCurrentUser(user);
+    // Ensure user has an avatar; fall back to bundled default avatar
+    const userWithAvatar = { ...user, avatar: user.avatar || defaultAvatar };
+    setCurrentUser(userWithAvatar);
   };
 
   const handleLogout = async () => {
@@ -177,8 +182,8 @@ export default function App() {
         {/* Logo */}
         <div className="p-6 border-b-2 border-orange-100">
           <div className="flex items-center gap-3">
-            <div className="p-3 bg-gradient-to-br from-orange-500 to-amber-600 rounded-2xl shadow-lg">
-              <Coffee className="h-8 w-8 text-white" strokeWidth={2} />
+            <div className="p-2 bg-gradient-to-br from-orange-500 to-amber-600 rounded-2xl shadow-lg flex items-center justify-center">
+              <img src={appIcon} alt="Cafe" className="h-8 w-8" />
             </div>
             <div>
               <h2 className="text-amber-900">Cafe Management</h2>
