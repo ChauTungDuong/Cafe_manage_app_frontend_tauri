@@ -77,7 +77,11 @@ export function Login({ onLogin }: LoginProps) {
           {/* Logo */}
           <div className="flex justify-center mb-6">
             <div className="bg-gradient-to-br from-orange-500 to-amber-600 p-4 rounded-2xl shadow-lg">
-              <img src="/default/AppIcon.png" alt="Cafe" className="h-16 w-16" />
+              <img
+                src="/default/AppIcon.png"
+                alt="Cafe"
+                className="h-16 w-16"
+              />
             </div>
           </div>
 
