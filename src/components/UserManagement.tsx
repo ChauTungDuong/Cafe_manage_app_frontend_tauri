@@ -285,10 +285,10 @@ export function UserManagement() {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-3xl font-bold text-amber-900">
-            Quản lý người dùng
-          </h2>
-          <p className="text-amber-600">Quản lý tài khoản admin và nhân viên</p>
+          <h2 className="text-amber-900 mb-1">Quản lý người dùng</h2>
+          <p className="text-amber-700/70">
+            Quản lý tài khoản admin và nhân viên
+          </p>
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
@@ -393,8 +393,8 @@ export function UserManagement() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="admin">👑 Admin</SelectItem>
-                    <SelectItem value="staff">👤 Staff</SelectItem>
+                    <SelectItem value="admin">👑 Quản trị viên</SelectItem>
+                    <SelectItem value="staff">👤 Nhân viên</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -448,11 +448,11 @@ export function UserManagement() {
           <p className="text-2xl font-bold text-blue-800">{totalUsers}</p>
         </Card>
         <Card className="p-4 border-2 border-purple-200 bg-purple-50">
-          <p className="text-sm text-purple-700 mb-1">Admin</p>
+          <p className="text-sm text-purple-700 mb-1">Quản trị viên</p>
           <p className="text-2xl font-bold text-purple-800">{adminCount}</p>
         </Card>
         <Card className="p-4 border-2 border-blue-200 bg-blue-50">
-          <p className="text-sm text-blue-700 mb-1">Staff</p>
+          <p className="text-sm text-blue-700 mb-1">Nhân viên</p>
           <p className="text-2xl font-bold text-blue-800">{staffCount}</p>
         </Card>
         <Card className="p-4 border-2 border-green-200 bg-green-50">
@@ -496,9 +496,14 @@ export function UserManagement() {
                 <div className="flex items-center justify-between gap-4">
                   {/* User Info */}
                   <div className="flex items-center gap-4 flex-1">
-                    <div className="h-12 w-12 rounded-full bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center text-white font-bold text-lg">
-                      {user.name.charAt(0).toUpperCase()}
-                    </div>
+                    <img
+                      src={user.avatar || "/default/default-avatar.jpg"}
+                      alt={user.name}
+                      className="h-12 w-12 rounded-full object-cover border-2 border-orange-200"
+                      onError={(e) => {
+                        e.currentTarget.src = "/default/default-avatar.jpg";
+                      }}
+                    />
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
                         <h4 className="font-bold text-amber-900">

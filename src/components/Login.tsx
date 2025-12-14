@@ -17,18 +17,20 @@ export function Login({ onLogin }: LoginProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState("");
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent, retryCount = 0) => {
     e.preventDefault();
     setError("");
     setIsLoading(true);
     setLoadingMessage("Đang kết nối đến server...");
 
-    console.log("🔐 Login attempt:", { email });
+    console.log("🔐 Login attempt:", { email, retry: retryCount });
 
     // Timeout để hiển thị message cold start
     const coldStartTimer = setTimeout(() => {
-      setLoadingMessage("Server đang khởi động, vui lòng đợi...");
-    }, 3000);
+      setLoadingMessage("Server đang khởi động (cold start), vui lòng đợi...");
+    }, 5000);
+
+    let shouldRetry = false;
 
     try {
       // Gọi API đăng nhập thực
@@ -52,10 +54,21 @@ export function Login({ onLogin }: LoginProps) {
         stack: err.stack,
       });
 
-      // Xử lý lỗi
-      if (err.code === "ECONNABORTED") {
+      // Xử lý lỗi timeout với retry tự động
+      if (err.code === "ECONNABORTED" && retryCount < 2) {
+        shouldRetry = true;
+        setLoadingMessage(`Timeout. Đang thử lại lần ${retryCount + 2}/3...`);
+        console.log(`🔄 Retrying login (${retryCount + 1}/2)...`);
+
+        // Đợi 2 giây rồi retry
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+
+        // Retry với event giả
+        const fakeEvent = { preventDefault: () => {} } as React.FormEvent;
+        return handleSubmit(fakeEvent, retryCount + 1);
+      } else if (err.code === "ECONNABORTED") {
         setError(
-          "Server đang khởi động (cold start). Vui lòng thử lại sau 10 giây."
+          "Không thể kết nối đến server sau 3 lần thử. Server có thể đang khởi động (cold start). Vui lòng thử lại sau 30 giây."
         );
       } else if (err.response?.data?.message) {
         setError(err.response.data.message);
@@ -65,8 +78,11 @@ export function Login({ onLogin }: LoginProps) {
         setError("Đăng nhập thất bại. Vui lòng thử lại!");
       }
     } finally {
-      setIsLoading(false);
-      setLoadingMessage("");
+      // Chỉ reset loading state nếu không retry
+      if (!shouldRetry) {
+        setIsLoading(false);
+        setLoadingMessage("");
+      }
     }
   };
 
@@ -76,13 +92,7 @@ export function Login({ onLogin }: LoginProps) {
         <div className="bg-white rounded-3xl shadow-2xl p-8">
           {/* Logo */}
           <div className="flex justify-center mb-6">
-            <div className="bg-gradient-to-br from-orange-500 to-amber-600 p-4 rounded-2xl shadow-lg">
-              <img
-                src="/default/AppIcon.png"
-                alt="Cafe"
-                className="h-16 w-16"
-              />
-            </div>
+            <img src="default/AppIcon.png" alt="Cafe" className="h-20 w-20" />
           </div>
 
           {/* Title */}

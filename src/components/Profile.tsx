@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card } from "./ui/card";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -17,8 +17,12 @@ import {
   Edit,
   Save,
   X,
+  Loader2,
+  Upload,
+  Camera,
 } from "lucide-react";
 import { User as UserType } from "../types/user";
+import { authApi } from "../lib/api";
 
 interface ProfileProps {
   user: UserType;
@@ -27,12 +31,19 @@ interface ProfileProps {
 
 export function Profile({ user, onUpdate }: ProfileProps) {
   const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string>("");
   const [formData, setFormData] = useState({
     name: user.name,
     email: user.email,
     phone: user.phone || "",
     address: user.address || "",
   });
+
+  // Image upload state
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string>("");
+  const avatarInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setFormData({
@@ -41,17 +52,81 @@ export function Profile({ user, onUpdate }: ProfileProps) {
       phone: user.phone || "",
       address: user.address || "",
     });
+    setAvatarPreview(user.avatar || "");
   }, [user]);
 
-  const handleSave = () => {
-    // TODO: Gọi API để update user info
-    if (onUpdate) {
-      onUpdate({
-        ...user,
-        ...formData,
-      });
+  // Handle avatar file selection
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Validate file type
+      if (!file.type.startsWith("image/")) {
+        setError("Vui lòng chọn file ảnh hợp lệ");
+        return;
+      }
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        setError("Kích thước ảnh không được vượt quá 5MB");
+        return;
+      }
+      setAvatarFile(file);
+      // Create preview URL
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setAvatarPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+      setError("");
     }
-    setIsEditing(false);
+  };
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    setError("");
+
+    try {
+      let updatedUser;
+
+      // Nếu có avatar mới, dùng FormData
+      if (avatarFile) {
+        const formDataToSend = new FormData();
+        formDataToSend.append("avatar", avatarFile);
+
+        // Thêm các trường text
+        if (formData.name) formDataToSend.append("name", formData.name);
+        if (formData.phone) formDataToSend.append("phone", formData.phone);
+        if (formData.address)
+          formDataToSend.append("address", formData.address);
+
+        updatedUser = await authApi.updateProfile(formDataToSend);
+      } else {
+        // Không có avatar, chỉ gửi JSON
+        updatedUser = await authApi.updateProfile(formData);
+      } // Cập nhật user trong localStorage
+      // Normalize API response to match local User type (ensure phone is a string)
+      const normalizedUser: UserType = {
+        ...(updatedUser as any),
+        phone: (updatedUser as any)?.phone ?? "",
+      };
+      localStorage.setItem("user", JSON.stringify(normalizedUser));
+
+      // Gọi callback onUpdate nếu có
+      if (onUpdate) {
+        onUpdate(normalizedUser);
+      }
+
+      alert("Cập nhật thông tin thành công!");
+      setIsEditing(false);
+    } catch (err: any) {
+      const message =
+        err.response?.data?.message ||
+        "Không thể cập nhật thông tin. Vui lòng thử lại!";
+      setError(Array.isArray(message) ? message.join(", ") : message);
+      alert(message);
+      console.error("Update profile error:", err);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleCancel = () => {
@@ -61,6 +136,9 @@ export function Profile({ user, onUpdate }: ProfileProps) {
       phone: user.phone || "",
       address: user.address || "",
     });
+    setAvatarFile(null);
+    setAvatarPreview(user.avatar || "");
+    setError("");
     setIsEditing(false);
   };
 
@@ -121,6 +199,7 @@ export function Profile({ user, onUpdate }: ProfileProps) {
               onClick={handleCancel}
               variant="outline"
               className="h-11 px-6 rounded-xl border-orange-200"
+              disabled={isSaving}
             >
               <X className="h-4 w-4 mr-2" />
               Hủy
@@ -128,24 +207,78 @@ export function Profile({ user, onUpdate }: ProfileProps) {
             <Button
               onClick={handleSave}
               className="h-11 px-6 bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white rounded-xl shadow-lg"
+              disabled={isSaving}
             >
-              <Save className="h-4 w-4 mr-2" />
-              Lưu
+              {isSaving ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Đang lưu...
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4 mr-2" />
+                  Lưu
+                </>
+              )}
             </Button>
           </div>
         )}
       </div>
 
-      <div className="grid gap-6 md:grid-cols-3">
+      {/* Error Display */}
+      {error && (
+        <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm">
+          {error}
+        </div>
+      )}
+
+      <div className="grid gap-6 md:grid-cols-2">
         {/* Avatar & Basic Info */}
-        <Card className="md:col-span-1 p-6 rounded-2xl border-2 border-orange-100">
+        <Card className="p-6 rounded-2xl border-2 border-orange-100">
           <div className="flex flex-col items-center text-center space-y-4">
-            <Avatar className="h-32 w-32 border-4 border-orange-100">
-              <AvatarImage src={user.avatar || defaultAvatar} alt={user.name} />
-              <AvatarFallback className="bg-gradient-to-br from-orange-500 to-amber-600 text-white text-3xl">
-                {user.name.charAt(0).toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
+            <div className="relative w-40 h-40 mx-auto">
+              <Avatar className="h-40 w-40 border-4 border-orange-100">
+                <AvatarImage
+                  src={avatarPreview || user.avatar || defaultAvatar}
+                  alt={user.name}
+                />
+                <AvatarFallback className="bg-gradient-to-br from-orange-500 to-amber-600 text-white text-4xl">
+                  {user.name.charAt(0).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+
+              {isEditing && (
+                <>
+                  <input
+                    ref={avatarInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleAvatarChange}
+                    className="hidden"
+                    style={{ display: "none" }}
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => avatarInputRef.current?.click()}
+                    className="absolute bottom-2 right-2 h-10 w-10 p-0 rounded-full bg-white border-2 border-orange-300 hover:bg-orange-50 shadow-lg"
+                    title="Thay đổi ảnh đại diện"
+                  >
+                    <Camera className="h-5 w-5 text-orange-600" />
+                  </Button>
+                </>
+              )}
+            </div>
+
+            {/* Show file size limit when editing */}
+            {isEditing && (
+              <p className="text-xs text-amber-600/70 text-center px-2">
+                {avatarFile
+                  ? `📷 ${avatarFile.name}`
+                  : "Max 10MB, JPEG/PNG/JPG/WEBP"}
+              </p>
+            )}
 
             <div className="w-full">
               <h3 className="text-amber-900 mb-2">{user.name}</h3>
@@ -176,7 +309,7 @@ export function Profile({ user, onUpdate }: ProfileProps) {
         </Card>
 
         {/* Detailed Information */}
-        <Card className="md:col-span-2 p-6 rounded-2xl border-2 border-orange-100">
+        <Card className="p-6 rounded-2xl border-2 border-orange-100">
           <h3 className="text-amber-900 mb-6">Chi tiết thông tin</h3>
 
           <div className="space-y-6">

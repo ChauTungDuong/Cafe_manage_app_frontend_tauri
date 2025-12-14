@@ -50,13 +50,61 @@ async function clearRefreshToken() {
 
 // Access token trong memory (không lưu vào disk)
 let accessToken: string | null = null;
+let tokenExpiryTime: number | null = null;
+let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+
+// Token refresh proactively 5 minutes before expiry (access token có thời hạn 1 tiếng)
+const REFRESH_BEFORE_EXPIRY = 5 * 60 * 1000; // 5 phút
 
 export function setAccessToken(token: string | null) {
   accessToken = token;
+
+  if (token) {
+    // Access token có thời hạn 1 tiếng, refresh sau 55 phút
+    tokenExpiryTime = Date.now() + 60 * 60 * 1000; // 1 giờ
+    scheduleTokenRefresh();
+  } else {
+    tokenExpiryTime = null;
+    if (refreshTimer) {
+      clearTimeout(refreshTimer);
+      refreshTimer = null;
+    }
+  }
 }
 
 export function getAccessToken(): string | null {
   return accessToken;
+}
+
+// Lên lịch refresh token tự động
+function scheduleTokenRefresh() {
+  if (refreshTimer) {
+    clearTimeout(refreshTimer);
+  }
+
+  if (!tokenExpiryTime) return;
+
+  const timeUntilRefresh = tokenExpiryTime - Date.now() - REFRESH_BEFORE_EXPIRY;
+
+  if (timeUntilRefresh > 0) {
+    console.log(
+      `🔄 Token refresh scheduled in ${Math.round(
+        timeUntilRefresh / 1000 / 60
+      )} minutes`
+    );
+    refreshTimer = setTimeout(async () => {
+      try {
+        console.log("🔄 Proactively refreshing access token...");
+        await authApi.refresh();
+        console.log("✅ Token refreshed successfully");
+      } catch (error) {
+        console.error("❌ Auto-refresh failed:", error);
+        // Nếu refresh thất bại, logout
+        await logout();
+        window.dispatchEvent(new CustomEvent("auth:logout"));
+      }
+    }, timeUntilRefresh);
+  }
 }
 
 // Tạo axios instance
@@ -65,7 +113,7 @@ const api: AxiosInstance = axios.create({
   headers: {
     "Content-Type": "application/json",
   },
-  timeout: 60000, // Tăng lên 60s cho cold start của Render.com
+  timeout: 120000, // 120s cho cold start của Render.com free tier
 });
 
 // Request interceptor - tự động thêm access token vào header
@@ -150,7 +198,14 @@ api.interceptors.response.use(
       try {
         const refreshToken = await getRefreshToken();
         if (!refreshToken) {
-          throw new Error("No refresh token available");
+          // Không có refresh token, logout và emit event để redirect về login
+          console.log("No refresh token found - redirecting to login");
+          processQueue(new Error("No refresh token"), null);
+          await logout();
+          window.dispatchEvent(new CustomEvent("auth:logout"));
+          return Promise.reject(
+            new Error("No refresh token - please login again")
+          );
         }
 
         // Gọi API refresh token (gửi qua body)
@@ -231,7 +286,8 @@ export const authApi = {
   async refresh(): Promise<{ access_token: string; refresh_token?: string }> {
     const refreshToken = await getRefreshToken();
     if (!refreshToken) {
-      throw new Error("No refresh token");
+      console.log("No refresh token found - cannot refresh");
+      throw new Error("No refresh token - please login again");
     }
 
     const response = await axios.post(`${BACKEND_URL}/auth/refresh`, {
@@ -264,9 +320,23 @@ export const authApi = {
     }
   },
 
-  // Kiểm tra auth
+  // Lấy thông tin user hiện tại (GET /auth/profile)
   async me() {
-    const response = await api.get("/auth/me");
+    const response = await api.get("/auth/profile");
+    return response.data;
+  },
+
+  // Cập nhật thông tin profile (PATCH /auth/profile)
+  // Supports both JSON and FormData (for avatar upload)
+  async updateProfile(data: Partial<User> | FormData): Promise<User> {
+    const config =
+      data instanceof FormData
+        ? {
+            headers: { "Content-Type": "multipart/form-data" },
+          }
+        : {};
+
+    const response = await api.patch("/auth/profile", data, config);
     return response.data;
   },
 };
@@ -293,6 +363,9 @@ import type {
   CreateOrderDto,
   Payment,
   CreatePaymentDto,
+  Statistic,
+  GenerateStatsResponse,
+  GenerateRangeResponse,
 } from "../types/api";
 
 export const usersApi = {
@@ -539,7 +612,7 @@ export const ordersApi = {
   // Update order (ADMIN)
   update: async (
     id: string,
-    dto: Partial<{ status: string; discount: number }>
+    dto: Partial<{ status: string }>
   ): Promise<Order> => {
     const response = await api.patch(`/orders/${id}`, dto);
     return response.data;
@@ -599,8 +672,161 @@ export const paymentsApi = {
   },
 };
 
+// ============ INGREDIENTS API ============
+import type {
+  Ingredient,
+  CreateIngredientDto,
+  BulkCreateIngredientsDto,
+} from "../types/api";
+
+export const ingredientsApi = {
+  // Get all ingredients
+  list: async (): Promise<Ingredient[]> => {
+    const response = await api.get("/ingredients");
+    return response.data;
+  },
+
+  // Get ingredient by ID
+  getById: async (id: string): Promise<Ingredient> => {
+    const response = await api.get(`/ingredients/${id}`);
+    return response.data;
+  },
+
+  // Create ingredient
+  create: async (dto: CreateIngredientDto | FormData): Promise<Ingredient> => {
+    const config =
+      dto instanceof FormData
+        ? {
+            headers: { "Content-Type": "multipart/form-data" },
+          }
+        : {};
+    const response = await api.post("/ingredients", dto, config);
+    return response.data;
+  },
+
+  // Bulk create ingredients
+  bulkCreate: async (
+    dto: BulkCreateIngredientsDto
+  ): Promise<{ message: string; count: number; ingredients: Ingredient[] }> => {
+    const response = await api.post("/ingredients/bulk", dto);
+    return response.data;
+  },
+
+  // Update ingredient
+  update: async (
+    id: string,
+    dto: Partial<CreateIngredientDto> | FormData
+  ): Promise<Ingredient> => {
+    const config =
+      dto instanceof FormData
+        ? {
+            headers: { "Content-Type": "multipart/form-data" },
+          }
+        : {};
+    const response = await api.patch(`/ingredients/${id}`, dto, config);
+    return response.data;
+  },
+
+  // Delete ingredient
+  remove: async (id: string): Promise<void> => {
+    await api.delete(`/ingredients/${id}`);
+  },
+};
+
+// ============ RECIPES API ============
+import type { Recipe, CreateRecipeDto } from "../types/api";
+
+export const recipesApi = {
+  // Get all recipes
+  list: async (): Promise<Recipe[]> => {
+    const response = await api.get("/recipes");
+    return response.data;
+  },
+
+  // Get recipe by ID
+  getById: async (id: string): Promise<Recipe> => {
+    const response = await api.get(`/recipes/${id}`);
+    return response.data;
+  },
+
+  // Get recipes by item ID
+  getByItemId: async (itemId: string): Promise<Recipe[]> => {
+    const response = await api.get(`/recipes/by-item/${itemId}`);
+    return response.data;
+  },
+
+  // Create recipe
+  create: async (dto: CreateRecipeDto): Promise<Recipe> => {
+    const response = await api.post("/recipes", dto);
+    return response.data;
+  },
+
+  // Update recipe
+  update: async (
+    id: string,
+    dto: Partial<CreateRecipeDto>
+  ): Promise<Recipe> => {
+    const response = await api.patch(`/recipes/${id}`, dto);
+    return response.data;
+  },
+
+  // Delete recipe
+  remove: async (id: string): Promise<void> => {
+    await api.delete(`/recipes/${id}`);
+  },
+};
+
 // ============ LEGACY ALIASES (for backward compatibility) ============
 export const menuApi = itemsApi; // Alias for items
+
+// ============ STATISTICS API ============
+export const statisticsApi = {
+  // Get all statistics with optional filters
+  list: async (params?: {
+    startDate?: string;
+    endDate?: string;
+    period?: "daily" | "monthly";
+  }): Promise<Statistic[]> => {
+    const queryParams = new URLSearchParams();
+    if (params?.startDate) queryParams.append("startDate", params.startDate);
+    if (params?.endDate) queryParams.append("endDate", params.endDate);
+    if (params?.period) queryParams.append("period", params.period);
+
+    const url = queryParams.toString()
+      ? `/statistics?${queryParams}`
+      : "/statistics";
+    const response = await api.get(url);
+    return response.data;
+  },
+
+  // Get daily statistics for specific date
+  getDaily: async (date: string): Promise<Statistic | null> => {
+    const response = await api.get(`/statistics/daily/${date}`);
+    return response.data;
+  },
+
+  // Get monthly statistics for specific month
+  getMonthly: async (yearMonth: string): Promise<Statistic | null> => {
+    const response = await api.get(`/statistics/monthly/${yearMonth}`);
+    return response.data;
+  },
+
+  // Generate statistics for last 30 days
+  generateLastMonth: async (): Promise<GenerateStatsResponse> => {
+    const response = await api.post("/statistics/generate-last-month");
+    return response.data;
+  },
+
+  // Generate statistics for custom date range
+  generateRange: async (
+    startDate: string,
+    endDate: string
+  ): Promise<GenerateRangeResponse> => {
+    const params = new URLSearchParams({ startDate, endDate });
+    const response = await api.post(`/statistics/generate-range?${params}`);
+    return response.data;
+  },
+};
 
 // ============ REPORTS API (Admin) ============
 export const reportsApi = {

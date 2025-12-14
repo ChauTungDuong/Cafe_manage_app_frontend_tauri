@@ -1,6 +1,15 @@
 import { useState, useEffect } from "react";
 import { Card } from "./ui/card";
 import { Button } from "./ui/button";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "./ui/dialog";
 import {
   BarChart,
   Bar,
@@ -19,21 +28,16 @@ import {
   ShoppingBag,
   RefreshCw,
   Calendar,
+  FileText,
+  Loader2,
 } from "lucide-react";
-import { ordersApi } from "../lib/api";
-import { Order } from "../types/api";
+import { statisticsApi } from "../lib/api";
+import { Statistic } from "../types/api";
 
-interface DailySales {
+interface ChartData {
   day: string;
   sales: number;
   count: number;
-}
-
-interface ProductSales {
-  name: string;
-  value: number;
-  revenue: number;
-  color: string;
 }
 
 const COLORS = [
@@ -48,155 +52,192 @@ const COLORS = [
 ];
 
 export function RevenueDashboard() {
-  const [timeRange, setTimeRange] = useState<"daily" | "monthly">("daily");
-  const [orders, setOrders] = useState<Order[]>([]);
+  const [period, setPeriod] = useState<"daily" | "monthly">("daily");
+  const [statistics, setStatistics] = useState<Statistic[]>([]);
   const [loading, setLoading] = useState(true);
+  const [generating, setGenerating] = useState(false);
   const [error, setError] = useState("");
+  const [showGenerateDialog, setShowGenerateDialog] = useState(false);
 
-  // Load paid orders
-  const loadOrders = async () => {
+  // Date range for filtering display
+  const [filterStartDate, setFilterStartDate] = useState("");
+  const [filterEndDate, setFilterEndDate] = useState("");
+
+  // Date range for generating reports
+  const [generateStartDate, setGenerateStartDate] = useState("");
+  const [generateEndDate, setGenerateEndDate] = useState("");
+
+  // Load statistics with optional date filter
+  const loadStatistics = async () => {
     try {
       setLoading(true);
       setError("");
-      const data = await ordersApi.list({ status: "paid" });
-      setOrders(data);
+      const params: any = { period };
+
+      // Add date filter if set
+      if (filterStartDate) params.startDate = filterStartDate;
+      if (filterEndDate) params.endDate = filterEndDate;
+
+      console.log("📊 Loading statistics with params:", params);
+      const data = await statisticsApi.list(params);
+      console.log("✅ Statistics loaded:", data);
+      console.log("📈 Total items:", data.length);
+
+      setStatistics(data);
     } catch (err: any) {
       setError(err.response?.data?.message || "Không thể tải dữ liệu");
-      console.error("Error loading orders:", err);
+      console.error("❌ Error loading statistics:", err);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadOrders();
-  }, []);
+    loadStatistics();
+  }, [period, filterStartDate, filterEndDate]);
 
-  // Calculate total revenue
-  const totalRevenue = orders.reduce(
-    (sum, order) => sum + order.totalAmount,
+  // Generate last 30 days statistics
+  const handleGenerateLastMonth = async () => {
+    try {
+      setGenerating(true);
+      setError("");
+      const result = await statisticsApi.generateLastMonth();
+      alert(
+        `Đã tạo thống kê cho ${result.processed} ngày thành công!\nTừ ${result.startDate} đến ${result.endDate}`
+      );
+      await loadStatistics();
+    } catch (err: any) {
+      setError(err.response?.data?.message || "Không thể tạo báo cáo");
+      console.error("Error generating statistics:", err);
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  // Generate custom date range statistics
+  const handleGenerateRange = async () => {
+    if (!generateStartDate || !generateEndDate) {
+      alert("Vui lòng chọn khoảng thời gian!");
+      return;
+    }
+
+    try {
+      setGenerating(true);
+      setError("");
+      const result = await statisticsApi.generateRange(
+        generateStartDate,
+        generateEndDate
+      );
+      alert(
+        `Đã tạo thống kê thành công!\n` +
+          `Daily: ${result.dailyStats.processed} ngày\n` +
+          `Monthly: ${result.monthlyStats.processed} tháng\n` +
+          `Từ ${result.startDate} đến ${result.endDate}`
+      );
+      setShowGenerateDialog(false);
+      await loadStatistics();
+    } catch (err: any) {
+      setError(err.response?.data?.message || "Không thể tạo báo cáo");
+      console.error("Error generating statistics:", err);
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  // Clear date filter
+  const handleClearFilter = () => {
+    setFilterStartDate("");
+    setFilterEndDate("");
+  };
+
+  // Calculate aggregated totals from statistics
+  const totalRevenue = statistics.reduce(
+    (sum, stat) => sum + (stat.totalRevenue || 0),
+    0
+  );
+  const totalOrders = statistics.reduce(
+    (sum, stat) => sum + (stat.totalOrders || 0),
+    0
+  );
+  const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+  const totalProductsSold = statistics.reduce(
+    (sum, stat) => sum + (stat.totalProductsSold || 0),
     0
   );
 
-  // Calculate average order value
-  const avgOrderValue = orders.length > 0 ? totalRevenue / orders.length : 0;
+  // Log calculations for debugging
+  console.log("💰 Calculations:", {
+    totalRevenue,
+    totalOrders,
+    avgOrderValue,
+    totalProductsSold,
+    statisticsCount: statistics.length,
+  });
 
-  // Get date range for filtering
-  const now = new Date();
-  const getDateKey = (date: Date, type: "daily" | "monthly") => {
-    if (type === "daily") {
-      // Get day of week: T2, T3, T4...
-      const days = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
-      return days[date.getDay()];
-    } else {
-      // Get month: T1, T2, T3...
-      return `T${date.getMonth() + 1}`;
-    }
-  };
+  // Prepare chart data
+  const chartData: ChartData[] = statistics
+    .slice()
+    .reverse()
+    .slice(0, period === "daily" ? 7 : 6)
+    .map((stat) => {
+      const date = new Date(stat.date);
+      let label = "";
 
-  // Calculate sales data based on time range
-  const calculateSalesData = (): DailySales[] => {
-    const salesMap = new Map<string, { sales: number; count: number }>();
-
-    if (timeRange === "daily") {
-      // Last 7 days
-      for (let i = 6; i >= 0; i--) {
-        const date = new Date(now);
-        date.setDate(date.getDate() - i);
-        const key = getDateKey(date, "daily");
-        salesMap.set(key, { sales: 0, count: 0 });
+      if (period === "daily") {
+        const days = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
+        label = days[date.getDay()];
+      } else {
+        label = `T${date.getMonth() + 1}`;
       }
 
-      // Aggregate orders from last 7 days
-      orders.forEach((order) => {
-        const orderDate = new Date(order.createdAt);
-        const diffTime = Math.abs(now.getTime() - orderDate.getTime());
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      return {
+        day: label,
+        sales: stat.totalRevenue,
+        count: stat.totalOrders,
+      };
+    });
 
-        if (diffDays <= 7) {
-          const key = getDateKey(orderDate, "daily");
-          const current = salesMap.get(key) || { sales: 0, count: 0 };
-          salesMap.set(key, {
-            sales: current.sales + order.totalAmount,
-            count: current.count + 1,
+  // Aggregate top products across all statistics
+  const getTopProducts = () => {
+    const productMap = new Map<
+      string,
+      { name: string; quantity: number; revenue: number }
+    >();
+
+    statistics.forEach((stat) => {
+      stat.topProducts.forEach((product) => {
+        const existing = productMap.get(product.itemId);
+        if (existing) {
+          existing.quantity += product.totalQuantity;
+          existing.revenue += product.totalRevenue;
+        } else {
+          productMap.set(product.itemId, {
+            name: product.itemName,
+            quantity: product.totalQuantity,
+            revenue: product.totalRevenue,
           });
         }
-      });
-    } else {
-      // Last 6 months
-      for (let i = 5; i >= 0; i--) {
-        const date = new Date(now);
-        date.setMonth(date.getMonth() - i);
-        const key = getDateKey(date, "monthly");
-        salesMap.set(key, { sales: 0, count: 0 });
-      }
-
-      // Aggregate orders from last 6 months
-      orders.forEach((order) => {
-        const orderDate = new Date(order.createdAt);
-        const diffTime = Math.abs(now.getTime() - orderDate.getTime());
-        const diffMonths = Math.ceil(diffTime / (1000 * 60 * 60 * 24 * 30));
-
-        if (diffMonths <= 6) {
-          const key = getDateKey(orderDate, "monthly");
-          const current = salesMap.get(key) || { sales: 0, count: 0 };
-          salesMap.set(key, {
-            sales: current.sales + order.totalAmount,
-            count: current.count + 1,
-          });
-        }
-      });
-    }
-
-    return Array.from(salesMap.entries()).map(([day, data]) => ({
-      day,
-      sales: data.sales,
-      count: data.count,
-    }));
-  };
-
-  // Calculate product sales
-  const calculateProductSales = (): ProductSales[] => {
-    const productMap = new Map<string, { count: number; revenue: number }>();
-
-    orders.forEach((order) => {
-      order.orderItems?.forEach((item) => {
-        const name = item.item.name;
-        const current = productMap.get(name) || { count: 0, revenue: 0 };
-        productMap.set(name, {
-          count: current.count + item.amount,
-          revenue: current.revenue + item.item.price * item.amount,
-        });
       });
     });
 
-    // Sort by count and take top 8
-    const sortedProducts = Array.from(productMap.entries())
-      .sort((a, b) => b[1].count - a[1].count)
+    return Array.from(productMap.values())
+      .sort((a, b) => b.quantity - a.quantity)
       .slice(0, 8)
-      .map(([name, data], index) => ({
-        name,
-        value: data.count,
-        revenue: data.revenue,
+      .map((product, index) => ({
+        name: product.name,
+        value: product.quantity,
+        revenue: product.revenue,
         color: COLORS[index],
       }));
-
-    return sortedProducts;
   };
 
-  // Get top 3 products
-  const getTopProducts = (): ProductSales[] => {
-    return calculateProductSales().slice(0, 3);
-  };
-
-  const chartData = calculateSalesData();
-  const productSalesData = calculateProductSales();
   const topProducts = getTopProducts();
+  const top3Products = topProducts.slice(0, 3);
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
-        <RefreshCw className="h-8 w-8 text-orange-600 animate-spin" />
+        <Loader2 className="h-8 w-8 text-orange-600 animate-spin" />
       </div>
     );
   }
@@ -208,7 +249,7 @@ export function RevenueDashboard() {
           <p className="text-red-600">{error}</p>
         </div>
         <Button
-          onClick={loadOrders}
+          onClick={loadStatistics}
           className="bg-gradient-to-r from-orange-500 to-amber-600 text-white rounded-xl"
         >
           <RefreshCw className="h-4 w-4 mr-2" />
@@ -221,16 +262,16 @@ export function RevenueDashboard() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h2 className="text-amber-900 mb-1">Báo cáo doanh thu</h2>
           <p className="text-amber-700/70">Tổng quan hiệu suất kinh doanh</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <Button
-            onClick={() => setTimeRange("daily")}
+            onClick={() => setPeriod("daily")}
             className={`h-11 px-6 rounded-xl transition-all ${
-              timeRange === "daily"
+              period === "daily"
                 ? "bg-gradient-to-r from-orange-500 to-amber-600 text-white"
                 : "bg-white text-amber-900 border-2 border-orange-200"
             }`}
@@ -239,9 +280,9 @@ export function RevenueDashboard() {
             Theo ngày
           </Button>
           <Button
-            onClick={() => setTimeRange("monthly")}
+            onClick={() => setPeriod("monthly")}
             className={`h-11 px-6 rounded-xl transition-all ${
-              timeRange === "monthly"
+              period === "monthly"
                 ? "bg-gradient-to-r from-orange-500 to-amber-600 text-white"
                 : "bg-white text-amber-900 border-2 border-orange-200"
             }`}
@@ -250,7 +291,80 @@ export function RevenueDashboard() {
             Theo tháng
           </Button>
           <Button
-            onClick={loadOrders}
+            onClick={handleGenerateLastMonth}
+            disabled={generating}
+            className="h-11 px-6 rounded-xl bg-gradient-to-r from-green-500 to-emerald-600 text-white"
+          >
+            {generating ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <FileText className="h-4 w-4 mr-2" />
+            )}
+            Tạo 30 ngày
+          </Button>
+          <Dialog
+            open={showGenerateDialog}
+            onOpenChange={setShowGenerateDialog}
+          >
+            <DialogTrigger asChild>
+              <Button className="h-11 px-6 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 text-white">
+                <FileText className="h-4 w-4 mr-2" />
+                Tạo báo cáo
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle className="text-amber-900">
+                  Tạo báo cáo theo khoảng thời gian
+                </DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="generateStartDate" className="text-amber-900">
+                    Ngày bắt đầu
+                  </Label>
+                  <Input
+                    id="generateStartDate"
+                    type="date"
+                    value={generateStartDate}
+                    onChange={(e) => setGenerateStartDate(e.target.value)}
+                    className="mt-1 border-orange-200 rounded-xl"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="generateEndDate" className="text-amber-900">
+                    Ngày kết thúc
+                  </Label>
+                  <Input
+                    id="generateEndDate"
+                    type="date"
+                    value={generateEndDate}
+                    onChange={(e) => setGenerateEndDate(e.target.value)}
+                    className="mt-1 border-orange-200 rounded-xl"
+                  />
+                </div>
+                <Button
+                  onClick={handleGenerateRange}
+                  disabled={generating}
+                  className="w-full h-11 bg-gradient-to-r from-orange-500 to-amber-600 text-white rounded-xl"
+                >
+                  {generating ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Đang tạo...
+                    </>
+                  ) : (
+                    <>
+                      <FileText className="h-4 w-4 mr-2" />
+                      Tạo báo cáo
+                    </>
+                  )}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+          <Button
+            onClick={loadStatistics}
             className="h-11 px-6 rounded-xl bg-white text-amber-900 border-2 border-orange-200"
           >
             <RefreshCw className="h-4 w-4 mr-2" />
@@ -258,6 +372,51 @@ export function RevenueDashboard() {
           </Button>
         </div>
       </div>
+
+      {/* Date Filter */}
+      <Card className="p-4 rounded-2xl border-2 border-orange-100">
+        <div className="flex items-end gap-4 flex-wrap">
+          <div className="flex-1 min-w-[200px]">
+            <Label htmlFor="filterStartDate" className="text-amber-900">
+              Từ ngày
+            </Label>
+            <Input
+              id="filterStartDate"
+              type="date"
+              value={filterStartDate}
+              onChange={(e) => setFilterStartDate(e.target.value)}
+              className="mt-1 border-orange-200 rounded-xl"
+            />
+          </div>
+          <div className="flex-1 min-w-[200px]">
+            <Label htmlFor="filterEndDate" className="text-amber-900">
+              Đến ngày
+            </Label>
+            <Input
+              id="filterEndDate"
+              type="date"
+              value={filterEndDate}
+              onChange={(e) => setFilterEndDate(e.target.value)}
+              className="mt-1 border-orange-200 rounded-xl"
+            />
+          </div>
+          <Button
+            onClick={handleClearFilter}
+            variant="outline"
+            className="h-11 px-6 rounded-xl border-2 border-orange-200 text-amber-900"
+          >
+            Xóa lọc
+          </Button>
+          <div className="text-sm text-amber-700/70">
+            {statistics.length > 0 && (
+              <span>
+                Hiển thị {statistics.length}{" "}
+                {period === "daily" ? "ngày" : "tháng"}
+              </span>
+            )}
+          </div>
+        </div>
+      </Card>
 
       {/* KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -283,7 +442,7 @@ export function RevenueDashboard() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-amber-700/70 mb-1">Tổng đơn hàng</p>
-              <p className="text-orange-600 mb-1">{orders.length}</p>
+              <p className="text-orange-600 mb-1">{totalOrders}</p>
               <div className="flex items-center gap-1 text-green-600">
                 <TrendingUp className="h-4 w-4" />
                 <span className="text-sm">Hoàn thành</span>
@@ -320,9 +479,7 @@ export function RevenueDashboard() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-amber-700/70 mb-1">Sản phẩm đã bán</p>
-              <p className="text-orange-600 mb-1">
-                {productSalesData.reduce((sum, p) => sum + p.value, 0)}
-              </p>
+              <p className="text-orange-600 mb-1">{totalProductsSold}</p>
               <div className="flex items-center gap-1 text-green-600">
                 <TrendingUp className="h-4 w-4" />
                 <span className="text-sm">Tổng số lượng</span>
@@ -341,12 +498,12 @@ export function RevenueDashboard() {
         <Card className="p-6 rounded-2xl border-2 border-orange-100">
           <div className="mb-4">
             <h3 className="text-amber-900 mb-1">
-              {timeRange === "daily"
+              {period === "daily"
                 ? "Doanh thu theo ngày"
                 : "Doanh thu theo tháng"}
             </h3>
             <p className="text-amber-700/70">
-              {timeRange === "daily" ? "7 ngày gần nhất" : "6 tháng gần nhất"}
+              {period === "daily" ? "7 ngày gần nhất" : "6 tháng gần nhất"}
             </p>
           </div>
           <ResponsiveContainer width="100%" height={300}>
@@ -385,11 +542,11 @@ export function RevenueDashboard() {
             <h3 className="text-amber-900 mb-1">Sản phẩm bán chạy</h3>
             <p className="text-amber-700/70">Phân bố theo sản phẩm</p>
           </div>
-          {productSalesData.length > 0 ? (
+          {topProducts.length > 0 ? (
             <ResponsiveContainer width="100%" height={300}>
               <PieChart>
                 <Pie
-                  data={productSalesData}
+                  data={topProducts}
                   cx="50%"
                   cy="50%"
                   labelLine={false}
@@ -400,7 +557,7 @@ export function RevenueDashboard() {
                   fill="#8884d8"
                   dataKey="value"
                 >
-                  {productSalesData.map((entry, index) => (
+                  {topProducts.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>
@@ -417,8 +574,8 @@ export function RevenueDashboard() {
 
       {/* Top Products */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {topProducts.length > 0 ? (
-          topProducts.map((product, index) => (
+        {top3Products.length > 0 ? (
+          top3Products.map((product, index) => (
             <Card
               key={index}
               className="p-6 rounded-2xl border-2 border-orange-100"

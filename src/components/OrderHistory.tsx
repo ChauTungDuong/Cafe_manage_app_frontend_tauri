@@ -155,10 +155,8 @@ export function OrderHistory() {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-3xl font-bold text-amber-900">
-            Lịch sử đơn hàng
-          </h2>
-          <p className="text-amber-600">Xem và quản lý đơn hàng</p>
+          <h2 className="text-amber-900 mb-1">Lịch sử đơn hàng</h2>
+          <p className="text-amber-700/70">Xem và quản lý đơn hàng</p>
         </div>
       </div>
 
@@ -275,17 +273,6 @@ export function OrderHistory() {
                           </span>
                         </div>
                         <div>
-                          <span className="text-amber-600">Giảm giá: </span>
-                          <span className="text-green-600 font-medium">
-                            {order.discount}% (-
-                            {(
-                              (order.totalAmount * order.discount) /
-                              100
-                            ).toLocaleString("vi-VN")}
-                            đ)
-                          </span>
-                        </div>
-                        <div>
                           <span className="text-amber-600">Ngày: </span>
                           <span className="text-amber-900">
                             {formatDateTime(order.createdAt)}
@@ -370,10 +357,22 @@ export function OrderHistory() {
                     </p>
                   </div>
                   <div>
-                    <span className="text-amber-600">Thuế:</span>
-                    <p className="font-semibold text-amber-900">
-                      {selectedOrder.tax?.name} ({selectedOrder.tax?.percent}%)
-                    </p>
+                    <span className="text-amber-600">Thuế & Giảm giá:</span>
+                    <div className="space-y-1 mt-1">
+                      {selectedOrder.taxesAndDiscounts.length > 0 ? (
+                        selectedOrder.taxesAndDiscounts.map((td) => (
+                          <p
+                            key={td.id}
+                            className="font-semibold text-amber-900"
+                          >
+                            {td.name} ({td.type === "tax" ? "+" : "-"}
+                            {parseFloat(td.percent)}%)
+                          </p>
+                        ))
+                      ) : (
+                        <p className="text-amber-700/50">Không có</p>
+                      )}
+                    </div>
                   </div>
                 </div>
               </Card>
@@ -458,47 +457,76 @@ export function OrderHistory() {
                   <div className="flex justify-between text-sm">
                     <span className="text-amber-700">Tạm tính:</span>
                     <span className="text-amber-900 font-medium">
-                      {(
-                        selectedOrder.totalAmount -
-                        (selectedOrder.totalAmount *
-                          selectedOrder.tax.percent) /
-                          (100 + selectedOrder.tax.percent)
-                      ).toLocaleString("vi-VN")}
+                      {(() => {
+                        // Calculate subtotal from order items
+                        const subtotal = selectedOrder.orderItems.reduce(
+                          (sum, item) => sum + item.item.price * item.amount,
+                          0
+                        );
+                        return subtotal.toLocaleString("vi-VN");
+                      })()}
                       đ
                     </span>
                   </div>
-                  {selectedOrder.discount > 0 && (
-                    <div className="flex justify-between text-sm">
-                      <span className="text-amber-700">
-                        Giảm giá ({selectedOrder.discount}%):
-                      </span>
-                      <span className="text-green-600 font-medium">
-                        -
-                        {(
-                          ((selectedOrder.totalAmount -
-                            (selectedOrder.totalAmount *
-                              selectedOrder.tax.percent) /
-                              (100 + selectedOrder.tax.percent)) *
-                            selectedOrder.discount) /
-                          100
-                        ).toLocaleString("vi-VN")}
-                        đ
-                      </span>
-                    </div>
-                  )}
-                  <div className="flex justify-between text-sm">
-                    <span className="text-amber-700">
-                      Thuế ({selectedOrder.tax.percent}%):
-                    </span>
-                    <span className="text-amber-900 font-medium">
-                      {(
-                        (selectedOrder.totalAmount *
-                          selectedOrder.tax.percent) /
-                        (100 + selectedOrder.tax.percent)
-                      ).toLocaleString("vi-VN")}
-                      đ
-                    </span>
-                  </div>
+
+                  {/* Display all taxes */}
+                  {selectedOrder.taxesAndDiscounts
+                    .filter((td) => td.type === "tax")
+                    .map((tax) => {
+                      const subtotal = selectedOrder.orderItems.reduce(
+                        (sum, item) => sum + item.item.price * item.amount,
+                        0
+                      );
+                      const taxAmount =
+                        (subtotal * parseFloat(tax.percent)) / 100;
+                      return (
+                        <div
+                          key={tax.id}
+                          className="flex justify-between text-sm"
+                        >
+                          <span className="text-amber-700">
+                            {tax.name} (+{parseFloat(tax.percent)}%):
+                          </span>
+                          <span className="text-amber-900 font-medium">
+                            +{taxAmount.toLocaleString("vi-VN")}đ
+                          </span>
+                        </div>
+                      );
+                    })}
+
+                  {/* Display all discounts */}
+                  {selectedOrder.taxesAndDiscounts
+                    .filter((td) => td.type === "discount")
+                    .map((discount) => {
+                      const subtotal = selectedOrder.orderItems.reduce(
+                        (sum, item) => sum + item.item.price * item.amount,
+                        0
+                      );
+                      // Calculate taxes first
+                      const totalTaxAmount = selectedOrder.taxesAndDiscounts
+                        .filter((td) => td.type === "tax")
+                        .reduce(
+                          (sum, tax) =>
+                            sum + (subtotal * parseFloat(tax.percent)) / 100,
+                          0
+                        );
+                      const subtotalWithTax = subtotal + totalTaxAmount;
+                      const discountAmount =
+                        (subtotalWithTax * parseFloat(discount.percent)) / 100;
+                      return (
+                        <div
+                          key={discount.id}
+                          className="flex justify-between text-sm"
+                        >
+                          <span className="text-amber-700">
+                            {discount.name} (-{parseFloat(discount.percent)}%):
+                          </span>
+                          <span className="text-green-600 font-medium">
+                            -{discountAmount.toLocaleString("vi-VN")}đ
+                          </span>
+                        </div>
+                      );
+                    })}
                   <Separator className="bg-orange-300" />
                   <div className="flex justify-between text-lg">
                     <span className="text-amber-900 font-semibold">

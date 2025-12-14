@@ -3,22 +3,19 @@ import App from "./App.tsx";
 import "./index.css";
 import { initStore } from "./lib/api";
 
-// App icon moved to `public/default` — use public path so Vite serves it directly
-const appIcon = "/default/AppIcon.png";
-
 // Khởi tạo store trước khi render app
 initStore().then(() => {
-  // Ensure the favicon uses the bundled asset path provided by Vite
+  // Ensure the favicon uses the ico file from public
   try {
     const existing = document.querySelector(
       "link[rel='icon']"
     ) as HTMLLinkElement | null;
     if (existing) {
-      existing.href = appIcon;
+      existing.href = "default/AppIcon.png";
     } else {
       const link = document.createElement("link");
       link.rel = "icon";
-      link.href = appIcon;
+      link.href = "default/AppIcon.png";
       document.head.appendChild(link);
     }
   } catch (e) {

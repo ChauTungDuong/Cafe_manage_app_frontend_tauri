@@ -49,7 +49,8 @@ export interface Tax {
   id: string;
   name: string;
   description?: string;
-  percent: number;
+  percent: string;
+  type: "tax" | "discount";
   createdAt?: string;
 }
 
@@ -63,10 +64,13 @@ export interface Order {
   id: string;
   orderCode: string;
   totalAmount: number;
-  discount: number;
   status: "pending" | "paid" | "cancelled";
-  createdBy: string;
-  tax: Tax;
+  createdBy: {
+    id: string;
+    name: string;
+    email: string;
+  };
+  taxesAndDiscounts: Tax[];
   table: Table;
   orderItems: OrderItem[];
   payments: Payment[];
@@ -82,6 +86,34 @@ export interface Payment {
   qrCode?: string;
   orderCode: string;
   createdAt: string;
+}
+
+// Ingredient & Recipe types
+export type MeasureUnit = "g" | "kg" | "l" | "ml" | "pcs" | "tsp" | "tbsp";
+
+export interface Ingredient {
+  id: string;
+  name: string;
+  amountLeft: number;
+  measureUnit: MeasureUnit;
+  image?: string;
+  imagePublicId?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface RecipeIngredient {
+  id: string;
+  ingredient: Ingredient;
+  amount: number;
+}
+
+export interface Recipe {
+  id: string;
+  item: Item;
+  recipeIngredients: RecipeIngredient[];
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 // Request DTOs
@@ -118,6 +150,32 @@ export interface CreateTableDto {
   status: "available" | "occupied" | "reserved";
 }
 
+export interface CreateIngredientDto {
+  name: string;
+  amountLeft: number;
+  measureUnit: MeasureUnit;
+}
+
+export interface BulkCreateIngredientsDto {
+  ingredients: CreateIngredientDto[];
+}
+
+export interface CreateRecipeIngredientDto {
+  ingredientId: string;
+  amount: number;
+}
+
+export interface CreateRecipeDto {
+  itemId: string;
+  ingredients: CreateRecipeIngredientDto[];
+}
+
+export interface CreateTaxDto {
+  name: string;
+  description?: string;
+  percent: number;
+}
+
 export interface CreateTaxDto {
   name: string;
   description?: string;
@@ -125,17 +183,60 @@ export interface CreateTaxDto {
 }
 
 export interface CreateOrderDto {
-  discount: number;
   createdBy: string;
-  taxId: string;
+  taxDiscountIds?: string[];
   tableId: string;
   orderItems: Array<{
-    itemId: string;
     amount: number;
+    itemId: string;
   }>;
 }
 
 export interface CreatePaymentDto {
   orderId: string;
   method: "cash" | "QR" | "card";
+}
+
+// ============ STATISTICS TYPES ============
+export interface TopProduct {
+  itemId: string;
+  itemName: string;
+  totalQuantity: number;
+  totalRevenue: number;
+}
+
+export interface Statistic {
+  id: string;
+  date: string;
+  period: "daily" | "monthly";
+  totalRevenue: number;
+  totalOrders: number;
+  averageOrderValue: number;
+  totalProductsSold: number;
+  topProducts: TopProduct[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface GenerateStatsResponse {
+  success: boolean;
+  message: string;
+  processed: number;
+  failed: number;
+  startDate: string;
+  endDate: string;
+}
+
+export interface GenerateRangeResponse {
+  success: boolean;
+  message: string;
+  dailyStats: {
+    processed: number;
+    failed: number;
+  };
+  monthlyStats: {
+    processed: number;
+  };
+  startDate: string;
+  endDate: string;
 }

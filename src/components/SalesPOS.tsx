@@ -11,6 +11,7 @@ import {
   QrCode,
   CheckCircle2,
   XCircle,
+  ChevronDown,
 } from "lucide-react";
 import { ScrollArea } from "./ui/scroll-area";
 import { Separator } from "./ui/separator";
@@ -21,7 +22,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "./ui/select";
-import { Input } from "./ui/input";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "./ui/collapsible";
 import {
   Dialog,
   DialogContent,
@@ -60,8 +65,10 @@ export function SalesPOS({ currentUser }: SalesPOSProps) {
   // UI state
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [selectedTable, setSelectedTable] = useState<string>("");
-  const [selectedTax, setSelectedTax] = useState<string>("");
-  const [discount, setDiscount] = useState<number>(0);
+  const [selectedTaxes, setSelectedTaxes] = useState<string[]>([]);
+  const [selectedDiscounts, setSelectedDiscounts] = useState<string[]>([]);
+  const [isTaxOpen, setIsTaxOpen] = useState(false);
+  const [isDiscountOpen, setIsDiscountOpen] = useState(false);
   const [order, setOrder] = useState<OrderItem[]>([]);
 
   // Loading & Error state
@@ -96,7 +103,8 @@ export function SalesPOS({ currentUser }: SalesPOSProps) {
   const resetForm = useCallback(async () => {
     setOrder([]);
     setSelectedTable("");
-    setDiscount(0);
+    setSelectedTaxes([]);
+    setSelectedDiscounts([]);
     setShowPaymentDialog(false);
     setOrderCode("");
     setOrderId("");
@@ -173,10 +181,6 @@ export function SalesPOS({ currentUser }: SalesPOSProps) {
     try {
       const data = await taxesApi.list();
       setTaxes(data);
-      // Auto-select first tax if available
-      if (data.length > 0 && !selectedTax) {
-        setSelectedTax(data[0].id);
-      }
     } catch (err: any) {
       console.error("Load taxes error:", err);
     } finally {
@@ -196,6 +200,30 @@ export function SalesPOS({ currentUser }: SalesPOSProps) {
     "all",
     ...Array.from(new Set(items.map((item) => item.category.name))),
   ];
+
+  // Translate category names to Vietnamese
+  const translateCategory = (categoryName: string | undefined): string => {
+    if (!categoryName) return "N/A";
+
+    const translations: Record<string, string> = {
+      coffee: "Cà phê",
+      "milk tea": "Trà sữa",
+      tea: "Trà",
+      smoothie: "Sinh tố",
+      juice: "Nước ép",
+      soda: "Soda",
+      yogurt: "Sữa chua",
+      "soft drinks": "Thức uống có ga",
+      dessert: "Tráng miệng",
+      cake: "Bánh ngọt",
+      pastry: "Bánh mì",
+      snack: "Đồ ăn vặt",
+      food: "Đồ ăn",
+      breakfast: "Bữa sáng",
+    };
+
+    return translations[categoryName.toLowerCase()] || categoryName;
+  };
 
   // Filter items by category
   const filteredItems =
@@ -247,20 +275,30 @@ export function SalesPOS({ currentUser }: SalesPOSProps) {
   };
 
   // Calculate totals
-  // Logic: Thuế tính trên giá gốc, sau đó mới áp dụng giảm giá
+  // Logic: Tính thuế và giảm giá dựa trên nhiều lựa chọn
   const subtotal = order.reduce(
     (sum, item) => sum + item.price * item.quantity,
     0
   );
-  const selectedTaxData = taxes.find((t) => t.id === selectedTax);
-  // Thuế tính trên giá gốc (trước giảm giá)
-  const taxAmount = selectedTaxData
-    ? (subtotal * selectedTaxData.percent) / 100
-    : 0;
-  const subtotalWithTax = subtotal + taxAmount;
-  // Giảm giá áp dụng sau thuế
-  const discountAmount = (subtotalWithTax * discount) / 100;
-  const total = Math.max(0, subtotalWithTax - discountAmount);
+
+  // Tính tổng thuế từ các thuế được chọn
+  const selectedTaxData = taxes.filter((t) => selectedTaxes.includes(t.id));
+  const totalTaxAmount = selectedTaxData.reduce((sum, tax) => {
+    return sum + (subtotal * Math.abs(parseFloat(String(tax.percent)))) / 100;
+  }, 0);
+
+  // Tính tổng giảm giá từ các giảm giá được chọn (tính trên subtotal theo yêu cầu)
+  const selectedDiscountData = taxes.filter((t) =>
+    selectedDiscounts.includes(t.id)
+  );
+  const totalDiscountAmount = selectedDiscountData.reduce((sum, discount) => {
+    return (
+      sum + (subtotal * Math.abs(parseFloat(String(discount.percent)))) / 100
+    );
+  }, 0);
+
+  // Tổng cuối cùng = subtotal + tổng thuế - tổng giảm giá
+  const total = Math.max(0, subtotal + totalTaxAmount - totalDiscountAmount);
 
   const handleCheckout = async () => {
     // Prevent duplicate calls
@@ -284,11 +322,6 @@ export function SalesPOS({ currentUser }: SalesPOSProps) {
       return;
     }
 
-    if (!selectedTax) {
-      alert("Vui lòng chọn thuế!");
-      return;
-    }
-
     console.log("🚀 Starting checkout process...");
     setIsProcessing(true);
     setError("");
@@ -296,13 +329,12 @@ export function SalesPOS({ currentUser }: SalesPOSProps) {
     try {
       // Create order
       const orderDto = {
-        discount: discount, // Send as percentage
         createdBy: currentUser.id,
-        taxId: selectedTax,
         tableId: selectedTable,
+        taxDiscountIds: [...selectedTaxes, ...selectedDiscounts], // Combine taxes and discounts
         orderItems: order.map((item) => ({
-          itemId: item.id,
           amount: item.quantity,
+          itemId: item.id,
         })),
       };
 
@@ -459,9 +491,7 @@ export function SalesPOS({ currentUser }: SalesPOSProps) {
                   : "bg-white text-amber-900 hover:bg-orange-50 border-2 border-orange-200"
               }`}
             >
-              {category === "all"
-                ? "Tất cả"
-                : category.charAt(0).toUpperCase() + category.slice(1)}
+              {category === "all" ? "Tất cả" : translateCategory(category)}
             </Button>
           ))}
         </div>
@@ -550,48 +580,123 @@ export function SalesPOS({ currentUser }: SalesPOSProps) {
               </Select>
             </div>
 
-            {/* Tax Selection */}
-            <div className="space-y-2 mb-3">
-              <label className="text-sm text-amber-900">Thuế</label>
-              <Select
-                value={selectedTax}
-                onValueChange={setSelectedTax}
-                disabled={isLoadingTaxes}
-              >
-                <SelectTrigger className="h-11 rounded-xl border-orange-200">
-                  <SelectValue
-                    placeholder={
-                      isLoadingTaxes ? "Đang tải..." : "Chọn thuế..."
-                    }
-                  />
-                </SelectTrigger>
-                <SelectContent>
-                  {taxes.map((tax) => (
-                    <SelectItem key={tax.id} value={tax.id}>
-                      {tax.name} ({tax.percent}%)
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {/* Tax Selection - Collapsible */}
+            <Collapsible
+              open={isTaxOpen}
+              onOpenChange={setIsTaxOpen}
+              className="mb-3"
+            >
+              <CollapsibleTrigger className="w-full flex items-center justify-between p-3 border border-orange-200 rounded-xl hover:bg-orange-50 transition-colors">
+                <span className="text-sm text-amber-900 font-medium">
+                  Thuế {selectedTaxes.length > 0 && `(${selectedTaxes.length})`}
+                </span>
+                <ChevronDown
+                  className={`h-4 w-4 text-amber-700 transition-transform ${
+                    isTaxOpen ? "rotate-180" : ""
+                  }`}
+                />
+              </CollapsibleTrigger>
+              <CollapsibleContent className="mt-2">
+                <div className="space-y-2 max-h-32 overflow-y-auto border border-orange-200 rounded-xl p-3">
+                  {isLoadingTaxes ? (
+                    <div className="text-sm text-amber-600">Đang tải...</div>
+                  ) : taxes.filter((t) => t.type === "tax").length === 0 ? (
+                    <div className="text-sm text-amber-600/50">
+                      Không có thuế
+                    </div>
+                  ) : (
+                    taxes
+                      .filter((t) => t.type === "tax")
+                      .map((tax) => (
+                        <label
+                          key={tax.id}
+                          className="flex items-center gap-2 cursor-pointer hover:bg-orange-50 p-2 rounded-lg"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedTaxes.includes(tax.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedTaxes([...selectedTaxes, tax.id]);
+                              } else {
+                                setSelectedTaxes(
+                                  selectedTaxes.filter((id) => id !== tax.id)
+                                );
+                              }
+                            }}
+                            className="h-4 w-4 rounded border-orange-300 text-orange-600 focus:ring-orange-500"
+                          />
+                          <span className="text-sm text-amber-900">
+                            {tax.name} (+
+                            {Math.abs(parseFloat(String(tax.percent)))}%)
+                          </span>
+                        </label>
+                      ))
+                  )}
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
 
-            {/* Discount Input */}
-            <div className="space-y-2">
-              <label className="text-sm text-amber-900">Giảm giá (%)</label>
-              <Input
-                type="number"
-                min="0"
-                max="100"
-                value={discount}
-                onChange={(e) =>
-                  setDiscount(
-                    Math.min(100, Math.max(0, parseInt(e.target.value) || 0))
-                  )
-                }
-                className="h-11 rounded-xl border-orange-200"
-                placeholder="0"
-              />
-            </div>
+            {/* Discount Selection - Collapsible */}
+            <Collapsible open={isDiscountOpen} onOpenChange={setIsDiscountOpen}>
+              <CollapsibleTrigger className="w-full flex items-center justify-between p-3 border border-orange-200 rounded-xl hover:bg-orange-50 transition-colors">
+                <span className="text-sm text-amber-900 font-medium">
+                  Giảm giá{" "}
+                  {selectedDiscounts.length > 0 &&
+                    `(${selectedDiscounts.length})`}
+                </span>
+                <ChevronDown
+                  className={`h-4 w-4 text-amber-700 transition-transform ${
+                    isDiscountOpen ? "rotate-180" : ""
+                  }`}
+                />
+              </CollapsibleTrigger>
+              <CollapsibleContent className="mt-2">
+                <div className="space-y-2 max-h-32 overflow-y-auto border border-orange-200 rounded-xl p-3">
+                  {isLoadingTaxes ? (
+                    <div className="text-sm text-amber-600">Đang tải...</div>
+                  ) : taxes.filter((t) => t.type === "discount").length ===
+                    0 ? (
+                    <div className="text-sm text-amber-600/50">
+                      Không có giảm giá
+                    </div>
+                  ) : (
+                    taxes
+                      .filter((t) => t.type === "discount")
+                      .map((discount) => (
+                        <label
+                          key={discount.id}
+                          className="flex items-center gap-2 cursor-pointer hover:bg-orange-50 p-2 rounded-lg"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedDiscounts.includes(discount.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedDiscounts([
+                                  ...selectedDiscounts,
+                                  discount.id,
+                                ]);
+                              } else {
+                                setSelectedDiscounts(
+                                  selectedDiscounts.filter(
+                                    (id) => id !== discount.id
+                                  )
+                                );
+                              }
+                            }}
+                            className="h-4 w-4 rounded border-orange-300 text-orange-600 focus:ring-orange-500"
+                          />
+                          <span className="text-sm text-amber-900">
+                            {discount.name} (-
+                            {Math.abs(parseFloat(String(discount.percent)))}%)
+                          </span>
+                        </label>
+                      ))
+                  )}
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
           </div>
 
           {/* Order Items */}
@@ -663,15 +768,60 @@ export function SalesPOS({ currentUser }: SalesPOSProps) {
               <span>Tạm tính:</span>
               <span>{subtotal.toLocaleString("vi-VN")}đ</span>
             </div>
-            <div className="flex justify-between text-sm text-amber-900">
-              <span>Thuế ({selectedTaxData?.percent || 0}%):</span>
-              <span>+{taxAmount.toLocaleString("vi-VN")}đ</span>
-            </div>
-            {discount > 0 && (
-              <div className="flex justify-between text-sm text-green-600">
-                <span>Giảm giá ({discount}%):</span>
-                <span>-{discountAmount.toLocaleString("vi-VN")}đ</span>
-              </div>
+            {selectedTaxData.length > 0 && (
+              <>
+                {selectedTaxData.map((tax) => (
+                  <div
+                    key={tax.id}
+                    className="flex justify-between text-sm text-blue-600"
+                  >
+                    <span>
+                      {tax.name} (+{Math.abs(parseFloat(String(tax.percent)))}
+                      %):
+                    </span>
+                    <span>
+                      +
+                      {(
+                        (subtotal * Math.abs(parseFloat(String(tax.percent)))) /
+                        100
+                      ).toLocaleString("vi-VN")}
+                      đ
+                    </span>
+                  </div>
+                ))}
+                <div className="flex justify-between text-sm font-medium text-blue-700">
+                  <span>Tổng thuế:</span>
+                  <span>+{totalTaxAmount.toLocaleString("vi-VN")}đ</span>
+                </div>
+              </>
+            )}
+            {selectedDiscountData.length > 0 && (
+              <>
+                {selectedDiscountData.map((discount) => (
+                  <div
+                    key={discount.id}
+                    className="flex justify-between text-sm text-green-600"
+                  >
+                    <span>
+                      {discount.name} (-
+                      {Math.abs(parseFloat(String(discount.percent)))}%):
+                    </span>
+                    <span>
+                      -
+                      {(
+                        (subtotal *
+                          Math.abs(parseFloat(String(discount.percent)))) /
+                        100
+                      ).toLocaleString("vi-VN")}
+                      đ
+                    </span>
+                  </div>
+                ))}
+                <div className="flex justify-between text-sm font-medium text-green-700">
+                  <span>Tổng giảm giá:</span>
+                  <span>-{totalDiscountAmount.toLocaleString("vi-VN")}đ</span>
+                </div>
+              </>
             )}
             <Separator className="bg-orange-200" />
             <div className="flex justify-between text-lg font-semibold text-amber-900">
@@ -682,12 +832,7 @@ export function SalesPOS({ currentUser }: SalesPOSProps) {
             </div>
             <Button
               onClick={handleCheckout}
-              disabled={
-                order.length === 0 ||
-                !selectedTable ||
-                !selectedTax ||
-                isProcessing
-              }
+              disabled={order.length === 0 || !selectedTable || isProcessing}
               className="w-full h-12 bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white rounded-xl shadow-lg hover:shadow-xl transition-all disabled:opacity-50"
             >
               {isProcessing ? (

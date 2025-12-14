@@ -1,34 +1,47 @@
-import { useState, useEffect } from 'react';
-import { Card } from './ui/card';
-import { Button } from './ui/button';
-import { Badge } from './ui/badge';
-import { Plus, Edit, Trash2, Users, Loader2, TableIcon } from 'lucide-react';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
-import { Label } from './ui/label';
-import { Input } from './ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { ScrollArea } from './ui/scroll-area';
-import { tablesApi } from '../lib/api';
-import type { Table, CreateTableDto } from '../types/api';
+import { useState, useEffect } from "react";
+import { Card } from "./ui/card";
+import { Button } from "./ui/button";
+import { Badge } from "./ui/badge";
+import { Plus, Edit, Trash2, Users, Loader2, TableIcon } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "./ui/dialog";
+import { Label } from "./ui/label";
+import { Input } from "./ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "./ui/select";
+import { ScrollArea } from "./ui/scroll-area";
+import { tablesApi } from "../lib/api";
+import type { Table, CreateTableDto } from "../types/api";
 
 export function TableManagement() {
   // Data state
   const [tables, setTables] = useState<Table[]>([]);
-  
+
   // UI state
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingTable, setEditingTable] = useState<Table | null>(null);
-  
+
   // Loading & Error state
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [error, setError] = useState<string>('');
-  
+  const [error, setError] = useState<string>("");
+
   // Form state
   const [formData, setFormData] = useState({
-    name: '',
-    seat: '2',
-    status: 'available' as 'available' | 'occupied' | 'reserved'
+    name: "",
+    seat: "2",
+    status: "available" as "available" | "occupied" | "reserved",
   });
 
   // Load data on mount
@@ -38,14 +51,15 @@ export function TableManagement() {
 
   const loadTables = async () => {
     setIsLoading(true);
-    setError('');
+    setError("");
     try {
       const data = await tablesApi.list();
       setTables(data);
     } catch (err: any) {
-      const message = err.response?.data?.message || 'Không thể tải danh sách bàn';
+      const message =
+        err.response?.data?.message || "Không thể tải danh sách bàn";
       setError(message);
-      console.error('Load tables error:', err);
+      console.error("Load tables error:", err);
     } finally {
       setIsLoading(false);
     }
@@ -53,14 +67,26 @@ export function TableManagement() {
 
   const getStatusInfo = (status: string) => {
     switch (status) {
-      case 'available':
-        return { label: 'Trống', color: 'bg-green-100 text-green-700 border-green-300' };
-      case 'occupied':
-        return { label: 'Đang dùng', color: 'bg-red-100 text-red-700 border-red-300' };
-      case 'reserved':
-        return { label: 'Đã đặt', color: 'bg-yellow-100 text-yellow-700 border-yellow-300' };
+      case "available":
+        return {
+          label: "Trống",
+          color: "bg-green-100 text-green-700 border-green-300",
+        };
+      case "occupied":
+        return {
+          label: "Đang dùng",
+          color: "bg-red-100 text-red-700 border-red-300",
+        };
+      case "reserved":
+        return {
+          label: "Đã đặt",
+          color: "bg-yellow-100 text-yellow-700 border-yellow-300",
+        };
       default:
-        return { label: status, color: 'bg-gray-100 text-gray-700 border-gray-300' };
+        return {
+          label: status,
+          color: "bg-gray-100 text-gray-700 border-gray-300",
+        };
     }
   };
 
@@ -71,12 +97,12 @@ export function TableManagement() {
       setFormData({
         name: table.name,
         seat: table.seat.toString(),
-        status: table.status as any
+        status: table.status as any,
       });
     } else {
       // Add mode
       setEditingTable(null);
-      setFormData({ name: '', seat: '2', status: 'available' });
+      setFormData({ name: "", seat: "2", status: "available" });
     }
     setIsDialogOpen(true);
   };
@@ -84,24 +110,24 @@ export function TableManagement() {
   const handleCloseDialog = () => {
     setIsDialogOpen(false);
     setEditingTable(null);
-    setFormData({ name: '', seat: '2', status: 'available' });
+    setFormData({ name: "", seat: "2", status: "available" });
   };
 
   const handleSave = async () => {
     // Validation
     if (!formData.name.trim()) {
-      alert('Vui lòng nhập tên bàn!');
+      alert("Vui lòng nhập tên bàn!");
       return;
     }
 
     const seatCount = parseInt(formData.seat);
     if (!seatCount || seatCount < 1) {
-      alert('Vui lòng nhập số ghế hợp lệ!');
+      alert("Vui lòng nhập số ghế hợp lệ!");
       return;
     }
 
     setIsSaving(true);
-    setError('');
+    setError("");
 
     try {
       if (editingTable) {
@@ -109,31 +135,33 @@ export function TableManagement() {
         const updateDto = {
           name: formData.name,
           seat: seatCount,
-          status: formData.status
+          status: formData.status,
         };
 
         await tablesApi.update(editingTable.id, updateDto);
-        alert('Cập nhật bàn thành công!');
+        alert("Cập nhật bàn thành công!");
       } else {
         // Create new table
         const createDto: CreateTableDto = {
           name: formData.name,
           seat: seatCount,
-          status: formData.status
+          status: formData.status,
         };
 
         await tablesApi.create(createDto);
-        alert('Thêm bàn thành công!');
+        alert("Thêm bàn thành công!");
       }
 
       // Reload data
       await loadTables();
       handleCloseDialog();
     } catch (err: any) {
-      const message = err.response?.data?.message || 'Không thể lưu thông tin bàn. Vui lòng thử lại!';
+      const message =
+        err.response?.data?.message ||
+        "Không thể lưu thông tin bàn. Vui lòng thử lại!";
       setError(message);
       alert(message);
-      console.error('Save table error:', err);
+      console.error("Save table error:", err);
     } finally {
       setIsSaving(false);
     }
@@ -144,44 +172,51 @@ export function TableManagement() {
       return;
     }
 
-    setError('');
+    setError("");
     try {
       await tablesApi.remove(id);
-      alert('Xóa bàn thành công!');
+      alert("Xóa bàn thành công!");
       await loadTables();
     } catch (err: any) {
-      const message = err.response?.data?.message || 'Không thể xóa bàn. Vui lòng thử lại!';
+      const message =
+        err.response?.data?.message || "Không thể xóa bàn. Vui lòng thử lại!";
       setError(message);
       alert(message);
-      console.error('Delete table error:', err);
+      console.error("Delete table error:", err);
     }
   };
 
-  const handleStatusChange = async (table: Table, newStatus: 'available' | 'occupied' | 'reserved') => {
-    setError('');
+  const handleStatusChange = async (
+    table: Table,
+    newStatus: "available" | "occupied" | "reserved"
+  ) => {
+    setError("");
     try {
       await tablesApi.update(table.id, { status: newStatus });
       await loadTables();
     } catch (err: any) {
-      const message = err.response?.data?.message || 'Không thể cập nhật trạng thái bàn';
+      const message =
+        err.response?.data?.message || "Không thể cập nhật trạng thái bàn";
       setError(message);
       alert(message);
-      console.error('Update status error:', err);
+      console.error("Update status error:", err);
     }
   };
 
   // Group tables by status
-  const availableTables = tables.filter(t => t.status === 'available');
-  const occupiedTables = tables.filter(t => t.status === 'occupied');
-  const reservedTables = tables.filter(t => t.status === 'reserved');
+  const availableTables = tables.filter((t) => t.status === "available");
+  const occupiedTables = tables.filter((t) => t.status === "occupied");
+  const reservedTables = tables.filter((t) => t.status === "reserved");
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-3xl font-bold text-amber-900">Quản lý bàn</h2>
-          <p className="text-amber-600">Quản lý trạng thái và thông tin bàn</p>
+          <h2 className="text-amber-900 mb-1">Quản lý bàn</h2>
+          <p className="text-amber-700/70">
+            Quản lý trạng thái và thông tin bàn
+          </p>
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
@@ -193,13 +228,15 @@ export function TableManagement() {
               Thêm bàn
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[400px]">
+          <DialogContent className="sm:max-w-[500px]">
             <DialogHeader>
               <DialogTitle>
-                {editingTable ? 'Chỉnh sửa bàn' : 'Thêm bàn mới'}
+                {editingTable ? "Chỉnh sửa bàn" : "Thêm bàn mới"}
               </DialogTitle>
               <DialogDescription>
-                {editingTable ? 'Cập nhật thông tin bàn' : 'Nhập thông tin bàn mới'}
+                {editingTable
+                  ? "Cập nhật thông tin bàn"
+                  : "Nhập thông tin bàn mới"}
               </DialogDescription>
             </DialogHeader>
 
@@ -210,7 +247,9 @@ export function TableManagement() {
                 <Input
                   id="name"
                   value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, name: e.target.value })
+                  }
                   placeholder="VD: Bàn 1, VIP 1"
                 />
               </div>
@@ -223,7 +262,9 @@ export function TableManagement() {
                   type="number"
                   min="1"
                   value={formData.seat}
-                  onChange={(e) => setFormData({ ...formData, seat: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, seat: e.target.value })
+                  }
                   placeholder="4"
                 />
               </div>
@@ -233,7 +274,9 @@ export function TableManagement() {
                 <Label>Trạng thái</Label>
                 <Select
                   value={formData.status}
-                  onValueChange={(value: any) => setFormData({ ...formData, status: value })}
+                  onValueChange={(value: any) =>
+                    setFormData({ ...formData, status: value })
+                  }
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -273,7 +316,7 @@ export function TableManagement() {
                     Đang lưu...
                   </>
                 ) : (
-                  'Lưu'
+                  "Lưu"
                 )}
               </Button>
             </div>
@@ -292,15 +335,21 @@ export function TableManagement() {
       <div className="grid grid-cols-3 gap-4">
         <Card className="p-4 border-2 border-green-200 bg-green-50">
           <p className="text-sm text-green-700 mb-1">Bàn trống</p>
-          <p className="text-2xl font-bold text-green-800">{availableTables.length}</p>
+          <p className="text-2xl font-bold text-green-800">
+            {availableTables.length}
+          </p>
         </Card>
         <Card className="p-4 border-2 border-red-200 bg-red-50">
           <p className="text-sm text-red-700 mb-1">Đang dùng</p>
-          <p className="text-2xl font-bold text-red-800">{occupiedTables.length}</p>
+          <p className="text-2xl font-bold text-red-800">
+            {occupiedTables.length}
+          </p>
         </Card>
         <Card className="p-4 border-2 border-yellow-200 bg-yellow-50">
           <p className="text-sm text-yellow-700 mb-1">Đã đặt</p>
-          <p className="text-2xl font-bold text-yellow-800">{reservedTables.length}</p>
+          <p className="text-2xl font-bold text-yellow-800">
+            {reservedTables.length}
+          </p>
         </Card>
       </div>
 
@@ -309,7 +358,9 @@ export function TableManagement() {
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
-            <span className="ml-3 text-amber-900">Đang tải danh sách bàn...</span>
+            <span className="ml-3 text-amber-900">
+              Đang tải danh sách bàn...
+            </span>
           </div>
         ) : tables.length === 0 ? (
           <div className="text-center py-12">
@@ -317,33 +368,43 @@ export function TableManagement() {
             <p className="text-amber-600/50">Chưa có bàn nào</p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
             {tables.map((table) => {
               const statusInfo = getStatusInfo(table.status);
               return (
                 <Card
                   key={table.id}
-                  className="p-4 hover:shadow-lg transition-all border-2 border-orange-100 hover:border-orange-300 rounded-2xl"
+                  className="p-6 hover:shadow-lg transition-all border-2 border-orange-100 hover:border-orange-300 rounded-2xl aspect-square flex flex-col justify-between"
                 >
-                  <div className="space-y-3">
+                  <div className="space-y-4">
                     {/* Table Name */}
-                    <div className="flex items-center justify-between">
-                      <h4 className="text-lg font-bold text-amber-900">{table.name}</h4>
-                      <Badge className={statusInfo.color}>{statusInfo.label}</Badge>
+                    <div className="flex flex-col items-center gap-2 text-center">
+                      <h4 className="text-2xl font-bold text-amber-900">
+                        {table.name}
+                      </h4>
+                      <Badge
+                        className={`${statusInfo.color} text-sm px-3 py-1`}
+                      >
+                        {statusInfo.label}
+                      </Badge>
                     </div>
 
                     {/* Seats */}
-                    <div className="flex items-center gap-2 text-amber-700">
-                      <Users className="h-4 w-4" />
-                      <span className="text-sm">{table.seat} ghế</span>
+                    <div className="flex items-center justify-center gap-2 text-amber-700">
+                      <Users className="h-5 w-5" />
+                      <span className="text-base font-medium">
+                        {table.seat} ghế
+                      </span>
                     </div>
 
                     {/* Status Change */}
                     <Select
                       value={table.status}
-                      onValueChange={(value: any) => handleStatusChange(table, value)}
+                      onValueChange={(value: any) =>
+                        handleStatusChange(table, value)
+                      }
                     >
-                      <SelectTrigger className="h-9 text-xs border-orange-200">
+                      <SelectTrigger className="h-10 border-orange-200">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -352,7 +413,9 @@ export function TableManagement() {
                         <SelectItem value="reserved">⚠️ Đã đặt</SelectItem>
                       </SelectContent>
                     </Select>
+                  </div>
 
+                  <div className="space-y-2">
                     {/* Actions */}
                     <div className="flex gap-2">
                       <Button
@@ -361,7 +424,7 @@ export function TableManagement() {
                         className="flex-1 border-orange-200 hover:bg-orange-50"
                         onClick={() => handleOpenDialog(table)}
                       >
-                        <Edit className="h-3 w-3 mr-1" />
+                        <Edit className="h-4 w-4 mr-1" />
                         Sửa
                       </Button>
                       <Button
@@ -370,7 +433,7 @@ export function TableManagement() {
                         className="border-red-200 hover:bg-red-50 text-red-600"
                         onClick={() => handleDelete(table.id, table.name)}
                       >
-                        <Trash2 className="h-3 w-3" />
+                        <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
                   </div>
