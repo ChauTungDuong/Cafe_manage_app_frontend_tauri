@@ -177,6 +177,25 @@ export function Profile({ user, onUpdate }: ProfileProps) {
 
   return (
     <div className="space-y-6">
+      <style>{`
+        @media (min-width: 768px) {
+          .profile-avatar-card {
+            width: 400px !important;
+            max-width: 400px !important;
+            flex-shrink: 0 !important;
+          }
+          .profile-container {
+            display: flex !important;
+            flex-direction: row !important;
+          }
+          .profile-avatar-image {
+            width: 296px !important;
+            height: 296px !important;
+            max-width: 296px !important;
+            max-height: 296px !important;
+          }
+        }
+      `}</style>
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -232,17 +251,17 @@ export function Profile({ user, onUpdate }: ProfileProps) {
         </div>
       )}
 
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="flex flex-col md:flex-row gap-6 profile-container">
         {/* Avatar & Basic Info */}
-        <Card className="p-6 rounded-2xl border-2 border-orange-100">
+        <Card className="p-6 rounded-2xl border-2 border-orange-100 profile-avatar-card md:flex-shrink-0">
           <div className="flex flex-col items-center text-center space-y-4">
-            <div className="relative w-40 h-40 mx-auto">
-              <Avatar className="h-40 w-40 border-4 border-orange-100">
+            <div className="relative w-24 h-24 mx-auto profile-avatar-image">
+              <Avatar className="h-24 w-24 border-4 border-orange-100 profile-avatar-image">
                 <AvatarImage
                   src={avatarPreview || user.avatar || defaultAvatar}
                   alt={user.name}
                 />
-                <AvatarFallback className="bg-gradient-to-br from-orange-500 to-amber-600 text-white text-4xl">
+                <AvatarFallback className="bg-gradient-to-br from-orange-500 to-amber-600 text-white text-2xl">
                   {user.name.charAt(0).toUpperCase()}
                 </AvatarFallback>
               </Avatar>
@@ -262,7 +281,7 @@ export function Profile({ user, onUpdate }: ProfileProps) {
                     size="sm"
                     variant="outline"
                     onClick={() => avatarInputRef.current?.click()}
-                    className="absolute bottom-2 right-2 h-10 w-10 p-0 rounded-full bg-white border-2 border-orange-300 hover:bg-orange-50 shadow-lg"
+                    className="absolute bottom-0 right-0 h-8 w-8 p-0 rounded-full bg-white border-2 border-orange-300 hover:bg-orange-50 shadow-lg"
                     title="Thay đổi ảnh đại diện"
                   >
                     <Camera className="h-5 w-5 text-orange-600" />
@@ -309,7 +328,7 @@ export function Profile({ user, onUpdate }: ProfileProps) {
         </Card>
 
         {/* Detailed Information */}
-        <Card className="p-6 rounded-2xl border-2 border-orange-100">
+        <Card className="p-6 rounded-2xl border-2 border-orange-100 w-full md:flex-1">
           <h3 className="text-amber-900 mb-6">Chi tiết thông tin</h3>
 
           <div className="space-y-6">
