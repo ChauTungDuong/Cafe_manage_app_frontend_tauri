@@ -449,8 +449,8 @@ export function InventoryManagement() {
       )}
 
       {/* Statistics */}
-      <div className="grid grid-cols-3 gap-4">
-        <Card className="p-4 border-2 border-blue-200 bg-blue-50">
+      <div className="flex flex-row gap-4">
+        <Card className="flex-1 p-4 border-2 border-blue-200 bg-blue-50">
           <div className="flex items-center gap-3">
             <Package className="h-8 w-8 text-blue-600" />
             <div>
@@ -461,7 +461,7 @@ export function InventoryManagement() {
             </div>
           </div>
         </Card>
-        <Card className="p-4 border-2 border-yellow-200 bg-yellow-50">
+        <Card className="flex-1 p-4 border-2 border-yellow-200 bg-yellow-50">
           <div className="flex items-center gap-3">
             <AlertTriangle className="h-8 w-8 text-yellow-600" />
             <div>
@@ -472,7 +472,7 @@ export function InventoryManagement() {
             </div>
           </div>
         </Card>
-        <Card className="p-4 border-2 border-red-200 bg-red-50">
+        <Card className="flex-1 p-4 border-2 border-red-200 bg-red-50">
           <div className="flex items-center gap-3">
             <Package className="h-8 w-8 text-red-600" />
             <div>
@@ -516,16 +516,16 @@ export function InventoryManagement() {
               <Card
                 key={ingredient.id}
                 className="overflow-hidden hover:shadow-xl transition-all border-2 border-orange-100 hover:border-orange-300 rounded-2xl flex flex-col"
-                style={{ height: "380px" }}
+                style={{ height: "430px" }}
               >
                 <div
                   className="relative bg-gradient-to-br from-orange-50 to-amber-50 flex-shrink-0"
-                  style={{ height: "200px" }}
+                  style={{ height: "250px" }}
                 >
                   <img
                     src={ingredient.image || "/default/default-avatar.jpg"}
                     alt={ingredient.name}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-contain"
                     onError={(e) => {
                       e.currentTarget.src = "/default/default-avatar.jpg";
                     }}

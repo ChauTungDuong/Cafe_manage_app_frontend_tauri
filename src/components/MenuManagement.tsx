@@ -1513,10 +1513,10 @@ export function MenuManagement() {
           >
             <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0 border-b">
               <DialogTitle>
-                {editingRecipeInTab
-                  ? "Chỉnh sửa công thức"
-                  : "Thêm công thức mới"}
-              </DialogTitle>
+                  {editingRecipeInTab
+                    ? "Chỉnh sửa công thức"
+                    : "Thêm công thức mới"}
+                </DialogTitle>
               <DialogDescription>
                 {editingRecipeInTab
                   ? "Cập nhật thông tin và nguyên liệu cho công thức"
@@ -1535,46 +1535,46 @@ export function MenuManagement() {
                 <div className="lg:col-span-1 space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="recipeName">
-                      Tên công thức <span className="text-red-500">*</span>
-                    </Label>
-                    <Input
+                          Tên công thức <span className="text-red-500">*</span>
+                        </Label>
+                        <Input
                       id="recipeName"
-                      value={recipeTabFormData.name}
-                      onChange={(e) =>
-                        setRecipeTabFormData({
-                          ...recipeTabFormData,
-                          name: e.target.value,
-                        })
-                      }
+                          value={recipeTabFormData.name}
+                          onChange={(e) =>
+                            setRecipeTabFormData({
+                              ...recipeTabFormData,
+                              name: e.target.value,
+                            })
+                          }
                       placeholder="VD: Công thức Cappuccino"
-                    />
-                  </div>
+                        />
+                      </div>
 
                   <div className="space-y-2">
                     <Label>
-                      Chọn món <span className="text-red-500">*</span>
-                    </Label>
-                    <Select
-                      value={recipeTabFormData.itemId}
-                      onValueChange={(value) =>
-                        setRecipeTabFormData({
-                          ...recipeTabFormData,
-                          itemId: value,
-                        })
-                      }
-                      disabled={!!editingRecipeInTab}
-                    >
+                          Chọn món <span className="text-red-500">*</span>
+                        </Label>
+                          <Select
+                            value={recipeTabFormData.itemId}
+                            onValueChange={(value) =>
+                              setRecipeTabFormData({
+                                ...recipeTabFormData,
+                                itemId: value,
+                              })
+                            }
+                            disabled={!!editingRecipeInTab}
+                          >
                       <SelectTrigger>
-                        <SelectValue placeholder="Chọn món" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {items.map((item) => (
-                          <SelectItem key={item.id} value={item.id}>
-                            {item.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                              <SelectValue placeholder="Chọn món" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {items.map((item) => (
+                                <SelectItem key={item.id} value={item.id}>
+                                  {item.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                   </div>
                 </div>
 
@@ -1609,49 +1609,49 @@ export function MenuManagement() {
                         key={index}
                         className="p-4 border rounded-lg space-y-3 relative group"
                       >
-                        <button
-                          onClick={() => {
-                            const newIngredients = [
-                              ...recipeTabFormData.ingredients,
-                            ];
-                            newIngredients.splice(index, 1);
-                            setRecipeTabFormData({
-                              ...recipeTabFormData,
-                              ingredients: newIngredients,
-                            });
-                          }}
+                          <button
+                            onClick={() => {
+                              const newIngredients = [
+                                ...recipeTabFormData.ingredients,
+                              ];
+                              newIngredients.splice(index, 1);
+                              setRecipeTabFormData({
+                                ...recipeTabFormData,
+                                ingredients: newIngredients,
+                              });
+                            }}
                           className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity p-1 text-gray-400 hover:text-red-500"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
                         <div className="grid grid-cols-2 gap-4">
                           <div className="space-y-2">
                             <Label className="text-xs">Nguyên liệu</Label>
-                            <Select
-                              value={ing.ingredientId}
-                              onValueChange={(value) => {
-                                const newIngredients = [
-                                  ...recipeTabFormData.ingredients,
-                                ];
-                                newIngredients[index].ingredientId = value;
-                                setRecipeTabFormData({
-                                  ...recipeTabFormData,
-                                  ingredients: newIngredients,
-                                });
-                              }}
-                            >
+                              <Select
+                                value={ing.ingredientId}
+                                onValueChange={(value) => {
+                                  const newIngredients = [
+                                    ...recipeTabFormData.ingredients,
+                                  ];
+                                  newIngredients[index].ingredientId = value;
+                                  setRecipeTabFormData({
+                                    ...recipeTabFormData,
+                                    ingredients: newIngredients,
+                                  });
+                                }}
+                              >
                               <SelectTrigger>
-                                <SelectValue placeholder="Chọn nguyên liệu" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {ingredients.map((i) => (
-                                  <SelectItem key={i.id} value={i.id}>
-                                    {i.name} ({i.measureUnit})
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
+                                  <SelectValue placeholder="Chọn nguyên liệu" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {ingredients.map((i) => (
+                                    <SelectItem key={i.id} value={i.id}>
+                                      {i.name} ({i.measureUnit})
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
                           <div className="space-y-2">
                             <Label className="text-xs">
                               Số lượng{" "}
@@ -1668,26 +1668,26 @@ export function MenuManagement() {
                                   )
                                 </span>
                               )}
-                            </Label>
-                            <Input
-                              type="number"
+                                </Label>
+                                <Input
+                                  type="number"
                               min="0"
                               step="0.01"
-                              value={ing.amount}
-                              onChange={(e) => {
-                                const newIngredients = [
-                                  ...recipeTabFormData.ingredients,
-                                ];
-                                newIngredients[index].amount = Number(
-                                  e.target.value
-                                );
-                                setRecipeTabFormData({
-                                  ...recipeTabFormData,
-                                  ingredients: newIngredients,
-                                });
-                              }}
+                                  value={ing.amount}
+                                  onChange={(e) => {
+                                    const newIngredients = [
+                                      ...recipeTabFormData.ingredients,
+                                    ];
+                                    newIngredients[index].amount = Number(
+                                      e.target.value
+                                    );
+                                    setRecipeTabFormData({
+                                      ...recipeTabFormData,
+                                      ingredients: newIngredients,
+                                    });
+                                  }}
                               placeholder="0"
-                            />
+                                />
                           </div>
                         </div>
                       </div>
@@ -1763,14 +1763,14 @@ export function MenuManagement() {
                 }}
                 disabled={isSaving}
               >
-                {isSaving ? (
+                  {isSaving ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                     Đang lưu...
                   </>
-                ) : (
+                  ) : (
                   "Lưu"
-                )}
+                  )}
               </Button>
             </div>
           </DialogContent>
