@@ -5,6 +5,7 @@ import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
 import { Badge } from "./ui/badge";
+import { Switch } from "./ui/switch";
 import {
   Dialog,
   DialogContent,
@@ -31,6 +32,7 @@ export function TaxManagement() {
     name: "",
     percent: 0,
     description: "",
+    type: "tax",
   });
 
   useEffect(() => {
@@ -60,6 +62,7 @@ export function TaxManagement() {
         name: tax.name,
         percent: Number(tax.percent),
         description: tax.description || "",
+        type: tax.type,
       });
     } else {
       setEditingTax(null);
@@ -67,6 +70,7 @@ export function TaxManagement() {
         name: "",
         percent: 0,
         description: "",
+        type: "tax",
       });
     }
     setIsDialogOpen(true);
@@ -75,12 +79,17 @@ export function TaxManagement() {
   const handleCloseDialog = () => {
     setIsDialogOpen(false);
     setEditingTax(null);
-    setFormData({ name: "", percent: 0, description: "" });
+    setFormData({ name: "", percent: 0, description: "", type: "tax" });
   };
 
   const handleSave = async () => {
     if (!formData.name.trim()) {
-      alert("Vui lòng nhập tên thuế!");
+      alert("Vui lòng nhập tên thuế/giảm giá!");
+      return;
+    }
+
+    if (formData.percent <= 0) {
+      alert("Vui lòng nhập phần trăm hợp lệ!");
       return;
     }
 
@@ -88,19 +97,32 @@ export function TaxManagement() {
     setError("");
 
     try {
+      // Convert percent based on type (discount should be negative)
+      const dataToSend = {
+        ...formData,
+        percent:
+          formData.type === "discount"
+            ? -Math.abs(formData.percent)
+            : Math.abs(formData.percent),
+      };
+
       if (editingTax) {
-        await taxesApi.update(editingTax.id, formData);
-        alert("Cập nhật thuế thành công!");
+        await taxesApi.update(editingTax.id, dataToSend);
+        alert("Cập nhật thành công!");
       } else {
-        await taxesApi.create(formData);
-        alert("Thêm thuế thành công!");
+        await taxesApi.create(dataToSend);
+        alert(
+          `Thêm ${
+            formData.type === "tax" ? "thuế" : "giảm giá"
+          } mới thành công!`
+        );
       }
 
       await loadTaxes();
       handleCloseDialog();
     } catch (err: any) {
       const message =
-        err.response?.data?.message || "Không thể lưu thuế. Vui lòng thử lại!";
+        err.response?.data?.message || "Không thể lưu. Vui lòng thử lại!";
       setError(message);
       alert(message);
       console.error("Save tax error:", err);
@@ -206,23 +228,63 @@ export function TaxManagement() {
                 />
               </div>
 
+              {/* Type Toggle */}
+              <div className="space-y-2">
+                <Label>Loại *</Label>
+                <div className="flex items-center gap-4 p-3 border-2 border-orange-200 rounded-lg bg-orange-50/30">
+                  <span
+                    className={`text-sm font-medium ${
+                      formData.type === "discount"
+                        ? "text-gray-400"
+                        : "text-orange-600"
+                    }`}
+                  >
+                    Thuế
+                  </span>
+                  <Switch
+                    checked={formData.type === "discount"}
+                    onCheckedChange={(checked) =>
+                      setFormData({
+                        ...formData,
+                        type: checked ? "discount" : "tax",
+                      })
+                    }
+                  />
+                  <span
+                    className={`text-sm font-medium ${
+                      formData.type === "tax"
+                        ? "text-gray-400"
+                        : "text-green-600"
+                    }`}
+                  >
+                    Giảm giá
+                  </span>
+                </div>
+              </div>
+
               <div className="space-y-2">
                 <Label htmlFor="percent">Phần trăm (%) *</Label>
                 <Input
                   id="percent"
                   type="number"
                   step="0.01"
-                  value={formData.percent}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      percent: Number(e.target.value),
-                    })
-                  }
-                  placeholder="Nhập số dương cho thuế, số âm cho giảm giá"
+                  min="0.01"
+                  max="100"
+                  value={Math.abs(formData.percent)}
+                  onChange={(e) => {
+                    const value = parseFloat(e.target.value);
+                    if (!isNaN(value) && value >= 0) {
+                      setFormData({
+                        ...formData,
+                        percent: value,
+                      });
+                    }
+                  }}
+                  placeholder="Nhập giá trị phần trăm (0.01 - 100)"
                 />
                 <p className="text-xs text-amber-600">
-                  Ví dụ: 10 = +10% (thuế), -15 = -15% (giảm giá)
+                  Ví dụ: 10 ={" "}
+                  {formData.type === "tax" ? "+10% (thuế)" : "-10% (giảm giá)"}
                 </p>
               </div>
 

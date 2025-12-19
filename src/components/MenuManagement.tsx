@@ -13,6 +13,10 @@ import {
   Upload,
   X,
   ChefHat,
+  Info,
+  Refrigerator,
+  Coffee,
+  Save,
 } from "lucide-react";
 import { Input } from "./ui/input";
 import {
@@ -21,7 +25,6 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "./ui/dialog";
 import { Label } from "./ui/label";
 import {
@@ -31,15 +34,25 @@ import {
   SelectTrigger,
   SelectValue,
 } from "./ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { ScrollArea } from "./ui/scroll-area";
 import { Textarea } from "./ui/textarea";
 import { itemsApi, categoriesApi, recipesApi } from "../lib/api";
-import type { Item, Category, CreateItemDto, Recipe } from "../types/api";
+import type {
+  Item,
+  Category,
+  CreateItemDto,
+  Recipe,
+  Ingredient,
+  CreateRecipeIngredientDto,
+} from "../types/api";
+import { toast } from "sonner";
 
 export function MenuManagement() {
   // Data state
   const [items, setItems] = useState<Item[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [ingredients, setIngredients] = useState<Ingredient[]>([]);
 
   // UI state
   const [searchQuery, setSearchQuery] = useState("");
@@ -47,10 +60,31 @@ export function MenuManagement() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<Item | null>(null);
   const [isRecipeDialogOpen, setIsRecipeDialogOpen] = useState(false);
+  const [isRecipeFormDialogOpen, setIsRecipeFormDialogOpen] = useState(false);
   const [selectedItemForRecipe, setSelectedItemForRecipe] =
     useState<Item | null>(null);
+  const [activeTab, setActiveTab] = useState<
+    "products" | "categories" | "recipes"
+  >("products");
   const [recipes, setRecipes] = useState<Recipe[]>([]);
+  const [editingRecipe, setEditingRecipe] = useState<Recipe | null>(null);
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false);
   const [isLoadingRecipes, setIsLoadingRecipes] = useState(false);
+
+  // State for Recipes Tab (all recipes)
+  const [allRecipes, setAllRecipes] = useState<Recipe[]>([]);
+  const [isLoadingAllRecipes, setIsLoadingAllRecipes] = useState(false);
+  const [isRecipeTabFormOpen, setIsRecipeTabFormOpen] = useState(false);
+  const [editingRecipeInTab, setEditingRecipeInTab] = useState<Recipe | null>(
+    null
+  );
+  const [recipeTabFormData, setRecipeTabFormData] = useState({
+    name: "",
+    description: "",
+    itemId: "",
+    ingredients: [] as CreateRecipeIngredientDto[],
+  });
 
   // Loading & Error state
   const [isLoading, setIsLoading] = useState(false);
@@ -65,7 +99,6 @@ export function MenuManagement() {
     categoryId: "",
     categoryName: "",
     price: "",
-    amountLeft: "",
     description: "",
     status: "available" as "available" | "out of stock" | "discontinued",
   });
@@ -75,11 +108,25 @@ export function MenuManagement() {
   const [imagePreview, setImagePreview] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Recipe form state
+  const [recipeFormData, setRecipeFormData] = useState({
+    name: "",
+    description: "",
+    ingredients: [] as CreateRecipeIngredientDto[],
+  });
+
+  // Category form state
+  const [categoryFormData, setCategoryFormData] = useState({
+    name: "",
+    description: "",
+  });
+
   // Load data on mount
   useEffect(() => {
     console.log("🚀 MenuManagement mounted");
     loadItems();
     loadCategories();
+    loadAllRecipes(); // Load recipes on mount
   }, []);
 
   const loadItems = async () => {
@@ -124,6 +171,35 @@ export function MenuManagement() {
     }
   };
 
+  // Load ingredients when opening recipe form
+  const loadIngredients = async () => {
+    try {
+      console.log("🥬 Loading ingredients...");
+      // Import ingredientsApi dynamically only when needed
+      const { ingredientsApi } = await import("../lib/api");
+      const data = await ingredientsApi.list();
+      console.log("✅ Ingredients loaded:", data);
+      setIngredients(data);
+    } catch (err: any) {
+      console.error("❌ Load ingredients error:", err);
+    }
+  };
+
+  // Load all recipes for Recipes tab
+  const loadAllRecipes = async () => {
+    setIsLoadingAllRecipes(true);
+    try {
+      console.log("📋 Loading all recipes...");
+      const data = await recipesApi.list();
+      console.log("✅ All recipes loaded:", data);
+      setAllRecipes(data);
+    } catch (err: any) {
+      console.error("❌ Load all recipes error:", err);
+    } finally {
+      setIsLoadingAllRecipes(false);
+    }
+  };
+
   const handleOpenDialog = (item?: Item) => {
     if (item) {
       // Edit mode
@@ -133,7 +209,6 @@ export function MenuManagement() {
         categoryId: item.category?.id || "",
         categoryName: item.category?.name || "",
         price: item.price.toString(),
-        amountLeft: item.amountLeft?.toString() || "0",
         description: item.description || "",
         status: item.status,
       });
@@ -149,7 +224,6 @@ export function MenuManagement() {
         categoryId: "",
         categoryName: "",
         price: "",
-        amountLeft: "",
         description: "",
         status: "available",
       });
@@ -167,7 +241,6 @@ export function MenuManagement() {
       categoryId: "",
       categoryName: "",
       price: "",
-      amountLeft: "",
       description: "",
       status: "available",
     });
@@ -181,12 +254,12 @@ export function MenuManagement() {
     if (file) {
       // Validate file type
       if (!file.type.startsWith("image/")) {
-        alert("Vui lòng chọn file ảnh!");
+        toast.error("Vui lòng chọn file ảnh!");
         return;
       }
-      // Validate file size (max 5MB)
-      if (file.size > 5 * 1024 * 1024) {
-        alert("Kích thước ảnh không được vượt quá 5MB!");
+      // Validate file size (max 10MB)
+      if (file.size > 10 * 1024 * 1024) {
+        toast.error("Kích thước ảnh không được vượt quá 10MB!");
         return;
       }
       setImageFile(file);
@@ -225,11 +298,6 @@ export function MenuManagement() {
       return;
     }
 
-    if (!formData.amountLeft || parseInt(formData.amountLeft) < 0) {
-      alert("Vui lòng nhập số lượng hợp lệ!");
-      return;
-    }
-
     setIsSaving(true);
     setError("");
 
@@ -242,7 +310,6 @@ export function MenuManagement() {
             name: formData.categoryName || editingItem.category?.name || "",
           },
           price: parseFloat(formData.price),
-          amountLeft: parseInt(formData.amountLeft),
           description: formData.description,
           status: formData.status,
         };
@@ -262,7 +329,6 @@ export function MenuManagement() {
             name: formData.categoryName || formData.categoryId, // Use categoryName for new categories
           },
           price: parseFloat(formData.price),
-          amountLeft: parseInt(formData.amountLeft),
           description: formData.description,
           status: formData.status,
         };
@@ -329,6 +395,246 @@ export function MenuManagement() {
     setIsRecipeDialogOpen(false);
     setSelectedItemForRecipe(null);
     setRecipes([]);
+  };
+
+  // Recipe Management Functions
+  const handleOpenRecipeForm = async (recipe?: Recipe) => {
+    // Load ingredients when opening recipe form
+    await loadIngredients();
+
+    if (recipe) {
+      // Edit mode
+      setEditingRecipe(recipe);
+      setRecipeFormData({
+        name: recipe.name,
+        description: recipe.description || "",
+        ingredients: recipe.recipeIngredients.map((ri) => ({
+          ingredientId: ri.ingredient.id,
+          amount: ri.amount,
+        })),
+      });
+    } else {
+      // Add mode
+      setEditingRecipe(null);
+      setRecipeFormData({
+        name: "",
+        description: "",
+        ingredients: [],
+      });
+    }
+    setIsRecipeFormDialogOpen(true);
+  };
+
+  const handleCloseRecipeForm = () => {
+    setIsRecipeFormDialogOpen(false);
+    setEditingRecipe(null);
+    setRecipeFormData({
+      name: "",
+      description: "",
+      ingredients: [],
+    });
+  };
+
+  const handleAddRecipeIngredient = () => {
+    setRecipeFormData({
+      ...recipeFormData,
+      ingredients: [
+        ...recipeFormData.ingredients,
+        { ingredientId: "", amount: 0 },
+      ],
+    });
+  };
+
+  const handleRemoveRecipeIngredient = (index: number) => {
+    setRecipeFormData({
+      ...recipeFormData,
+      ingredients: recipeFormData.ingredients.filter((_, i) => i !== index),
+    });
+  };
+
+  const handleUpdateRecipeIngredient = (
+    index: number,
+    field: keyof CreateRecipeIngredientDto,
+    value: any
+  ) => {
+    const newIngredients = [...recipeFormData.ingredients];
+    newIngredients[index] = { ...newIngredients[index], [field]: value };
+    setRecipeFormData({
+      ...recipeFormData,
+      ingredients: newIngredients,
+    });
+  };
+
+  const handleSaveRecipe = async () => {
+    if (!selectedItemForRecipe) return;
+
+    // Validation
+    if (!recipeFormData.name.trim()) {
+      alert("Vui lòng nhập tên công thức!");
+      return;
+    }
+
+    if (recipeFormData.ingredients.length === 0) {
+      alert("Vui lòng thêm ít nhất một nguyên liệu!");
+      return;
+    }
+
+    // Validate all ingredients
+    for (let i = 0; i < recipeFormData.ingredients.length; i++) {
+      const ing = recipeFormData.ingredients[i];
+      if (!ing.ingredientId) {
+        alert(`Vui lòng chọn nguyên liệu cho dòng ${i + 1}!`);
+        return;
+      }
+      if (!ing.amount || ing.amount <= 0) {
+        alert(`Vui lòng nhập số lượng hợp lệ cho dòng ${i + 1}!`);
+        return;
+      }
+    }
+
+    setIsSaving(true);
+    setError("");
+
+    try {
+      if (editingRecipe) {
+        // Update existing recipe
+        await recipesApi.update(editingRecipe.id, {
+          name: recipeFormData.name,
+          description: recipeFormData.description,
+          ingredients: recipeFormData.ingredients,
+        });
+        alert("Cập nhật công thức thành công!");
+      } else {
+        // Create new recipe
+        await recipesApi.create({
+          name: recipeFormData.name,
+          description: recipeFormData.description,
+          itemId: selectedItemForRecipe.id,
+          ingredients: recipeFormData.ingredients,
+        });
+        alert("Tạo công thức mới thành công!");
+      }
+
+      handleCloseRecipeForm();
+      // Reload recipes
+      const updatedRecipes = await recipesApi.getByItemId(
+        selectedItemForRecipe.id
+      );
+      setRecipes(updatedRecipes);
+    } catch (err: any) {
+      const message = err.response?.data?.message || "Không thể lưu công thức";
+      setError(message);
+      alert(message);
+      console.error("Save recipe error:", err);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDeleteRecipe = async (recipeId: string, recipeName: string) => {
+    if (!confirm(`Bạn có chắc muốn xóa công thức "${recipeName}"?`)) {
+      return;
+    }
+
+    try {
+      await recipesApi.delete(recipeId);
+      alert("Xóa công thức thành công!");
+      // Reload recipes
+      if (selectedItemForRecipe) {
+        const updatedRecipes = await recipesApi.getByItemId(
+          selectedItemForRecipe.id
+        );
+        setRecipes(updatedRecipes);
+      }
+    } catch (err: any) {
+      const message = err.response?.data?.message || "Không thể xóa công thức";
+      alert(message);
+      console.error("Delete recipe error:", err);
+    }
+  };
+
+  // Category Management Functions
+  const handleOpenCategoryDialog = (category?: Category) => {
+    if (category) {
+      // Edit mode
+      setEditingCategory(category);
+      setCategoryFormData({
+        name: category.name,
+        description: category.description || "",
+      });
+    } else {
+      // Add mode
+      setEditingCategory(null);
+      setCategoryFormData({
+        name: "",
+        description: "",
+      });
+    }
+    setIsCategoryDialogOpen(true);
+  };
+
+  const handleCloseCategoryDialog = () => {
+    setEditingCategory(null);
+    setCategoryFormData({
+      name: "",
+      description: "",
+    });
+    setIsCategoryDialogOpen(false);
+  };
+
+  const handleSaveCategory = async () => {
+    // Validation
+    if (!categoryFormData.name.trim()) {
+      toast.error("Vui lòng nhập tên danh mục!");
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      if (editingCategory) {
+        // Update existing category
+        await categoriesApi.update(editingCategory.id, categoryFormData);
+        toast.success("Cập nhật danh mục thành công!");
+      } else {
+        // Create new category
+        await categoriesApi.create(categoryFormData);
+        toast.success("Thêm danh mục thành công!");
+      }
+      await loadCategories();
+      handleCloseCategoryDialog();
+    } catch (err: any) {
+      const message = err.response?.data?.message || "Không thể lưu danh mục";
+      toast.error(message);
+      console.error("Save category error:", err);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDeleteCategory = async (
+    categoryId: string,
+    categoryName: string
+  ) => {
+    if (
+      !confirm(
+        `Bạn có chắc muốn xóa danh mục "${categoryName}"?\nLưu ý: Không thể xóa danh mục đang có sản phẩm.`
+      )
+    ) {
+      return;
+    }
+
+    try {
+      await categoriesApi.remove(categoryId);
+      alert("Xóa danh mục thành công!");
+      // Reload categories
+      await loadCategories();
+    } catch (err: any) {
+      const message =
+        err.response?.data?.message ||
+        "Không thể xóa danh mục. Có thể danh mục đang được sử dụng.";
+      alert(message);
+      console.error("Delete category error:", err);
+    }
   };
 
   // Translate category names to Vietnamese
@@ -399,431 +705,1096 @@ export function MenuManagement() {
     return (
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex justify-between items-center">
+        <div className="flex justify-between items-center flex-wrap gap-4">
           <div>
             <h2 className="text-amber-900 mb-1">Quản lý thực đơn</h2>
-            <p className="text-amber-700/70">Quản lý sản phẩm và danh mục</p>
+            <p className="text-amber-700/70">
+              Quản lý sản phẩm, danh mục và công thức
+            </p>
           </div>
-          <Button
-            onClick={() => handleOpenDialog()}
-            className="bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white"
-          >
-            <Plus className="h-5 w-5 mr-2" />
-            Thêm sản phẩm
-          </Button>
         </div>
 
-        {/* Add/Edit Item Dialog */}
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent className="w-[90vw] max-w-[700px] max-h-[85vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>
-                {editingItem ? "Chỉnh sửa sản phẩm" : "Thêm sản phẩm mới"}
-              </DialogTitle>
-              <DialogDescription>
-                {editingItem
-                  ? "Cập nhật thông tin sản phẩm"
-                  : "Nhập thông tin sản phẩm mới"}
-              </DialogDescription>
-            </DialogHeader>
+        {/* Tabs - Browser Style */}
+        <Tabs
+          value={activeTab}
+          className="w-full"
+          onValueChange={(value) => {
+            setActiveTab(value as "products" | "categories" | "recipes");
+            if (value === "recipes" && allRecipes.length === 0) {
+              loadAllRecipes();
+            }
+          }}
+        >
+          <TabsList className="inline-flex h-auto items-center justify-center bg-orange-50/50 p-2 gap-2 w-full rounded-xl border-2 border-orange-100">
+            <TabsTrigger
+              value="products"
+              className="flex-1 h-11 px-6 text-sm font-medium rounded-lg transition-all data-[state=inactive]:bg-white data-[state=inactive]:text-gray-600 data-[state=inactive]:hover:text-orange-600 data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-amber-600 data-[state=active]:text-white shadow-sm"
+            >
+              <Package className="h-4 w-4 mr-2" />
+              Sản phẩm
+            </TabsTrigger>
+            <TabsTrigger
+              value="categories"
+              className="flex-1 h-11 px-6 text-sm font-medium rounded-lg transition-all data-[state=inactive]:bg-white data-[state=inactive]:text-gray-600 data-[state=inactive]:hover:text-orange-600 data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-amber-600 data-[state=active]:text-white shadow-sm"
+            >
+              <Package className="h-4 w-4 mr-2" />
+              Danh mục
+            </TabsTrigger>
+            <TabsTrigger
+              value="recipes"
+              className="flex-1 h-11 px-6 text-sm font-medium rounded-lg transition-all data-[state=inactive]:bg-white data-[state=inactive]:text-gray-600 data-[state=inactive]:hover:text-orange-600 data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-amber-600 data-[state=active]:text-white shadow-sm"
+            >
+              <ChefHat className="h-4 w-4 mr-2" />
+              Công thức
+            </TabsTrigger>
+          </TabsList>
 
-            {/* 2-column layout */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4">
-              {/* Left Column - Form Fields */}
-              <div className="space-y-4">
-                {/* Name */}
-                <div className="space-y-2">
-                  <Label htmlFor="name">Tên sản phẩm *</Label>
-                  <Input
-                    id="name"
-                    value={formData.name}
-                    onChange={(e) =>
-                      setFormData({ ...formData, name: e.target.value })
-                    }
-                    placeholder="VD: Cappuccino"
-                  />
-                </div>
+          {/* Products Tab */}
+          <TabsContent
+            value="products"
+            className="mt-0 bg-white p-6 border-2 border-t-0 border-orange-200 rounded-b-lg space-y-6"
+          >
+            <div className="flex justify-end">
+              <Button
+                onClick={() => handleOpenDialog()}
+                className="bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white"
+              >
+                <Plus className="h-5 w-5 mr-2" />
+                Thêm sản phẩm
+              </Button>
+            </div>
 
-                {/* Category */}
-                <div className="space-y-2">
-                  <Label>Danh mục *</Label>
-                  {editingItem ? (
-                    // Edit mode: show current category (read-only)
-                    <Input
-                      value={editingItem.category?.name || "N/A"}
-                      disabled
-                      className="bg-gray-50"
-                    />
-                  ) : (
-                    // Add mode: select existing or enter new
+            {/* Add/Edit Item Dialog */}
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+              <DialogContent className="w-[90vw] max-w-[700px] max-h-[85vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>
+                    {editingItem ? "Chỉnh sửa sản phẩm" : "Thêm sản phẩm mới"}
+                  </DialogTitle>
+                  <DialogDescription>
+                    {editingItem
+                      ? "Cập nhật thông tin sản phẩm"
+                      : "Nhập thông tin sản phẩm mới"}
+                  </DialogDescription>
+                </DialogHeader>
+
+                {/* 2-column layout */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4">
+                  {/* Left Column - Form Fields */}
+                  <div className="space-y-4">
+                    {/* Name */}
                     <div className="space-y-2">
-                      <Select
-                        value={formData.categoryId}
-                        onValueChange={(value: string) =>
-                          setFormData({
-                            ...formData,
-                            categoryId: value,
-                            categoryName: "",
-                          })
+                      <Label htmlFor="name">Tên sản phẩm *</Label>
+                      <Input
+                        id="name"
+                        value={formData.name}
+                        onChange={(e) =>
+                          setFormData({ ...formData, name: e.target.value })
                         }
-                        disabled={isLoadingCategories}
+                        placeholder="VD: Cappuccino"
+                      />
+                    </div>
+
+                    {/* Category */}
+                    <div className="space-y-2">
+                      <Label>Danh mục *</Label>
+                      {editingItem ? (
+                        // Edit mode: show current category (read-only)
+                        <Input
+                          value={editingItem.category?.name || "N/A"}
+                          disabled
+                          className="bg-gray-50"
+                        />
+                      ) : (
+                        // Add mode: select existing or enter new
+                        <div className="space-y-2">
+                          <Select
+                            value={formData.categoryId}
+                            onValueChange={(value: string) =>
+                              setFormData({
+                                ...formData,
+                                categoryId: value,
+                                categoryName: "",
+                              })
+                            }
+                            disabled={isLoadingCategories}
+                          >
+                            <SelectTrigger>
+                              <SelectValue
+                                placeholder={
+                                  isLoadingCategories
+                                    ? "Đang tải..."
+                                    : "Chọn danh mục có sẵn"
+                                }
+                              />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {categories.map((cat) => (
+                                <SelectItem key={cat.id} value={cat.name}>
+                                  {cat.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <p className="text-sm text-gray-500">
+                            Hoặc nhập tên danh mục mới:
+                          </p>
+                          <Input
+                            value={formData.categoryName}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                categoryName: e.target.value,
+                                categoryId: "",
+                              })
+                            }
+                            placeholder="VD: coffee, tea, pastry"
+                            disabled={!!formData.categoryId}
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Price */}
+                    <div className="space-y-2">
+                      <Label htmlFor="price">Giá (VND) *</Label>
+                      <Input
+                        id="price"
+                        type="number"
+                        min="0"
+                        value={formData.price}
+                        onChange={(e) =>
+                          setFormData({ ...formData, price: e.target.value })
+                        }
+                        placeholder="45000"
+                      />
+                    </div>
+
+                    {/* Status */}
+                    <div className="space-y-2">
+                      <Label>Trạng thái</Label>
+                      <Select
+                        value={formData.status}
+                        onValueChange={(value: any) =>
+                          setFormData({ ...formData, status: value })
+                        }
                       >
                         <SelectTrigger>
-                          <SelectValue
-                            placeholder={
-                              isLoadingCategories
-                                ? "Đang tải..."
-                                : "Chọn danh mục có sẵn"
-                            }
-                          />
+                          <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {categories.map((cat) => (
-                            <SelectItem key={cat.id} value={cat.name}>
-                              {cat.name}
-                            </SelectItem>
-                          ))}
+                          <SelectItem value="available">✅ Còn hàng</SelectItem>
+                          <SelectItem value="out of stock">
+                            ⚠️ Hết hàng
+                          </SelectItem>
+                          <SelectItem value="discontinued">
+                            🚫 Ngừng bán
+                          </SelectItem>
                         </SelectContent>
                       </Select>
-                      <p className="text-sm text-gray-500">
-                        Hoặc nhập tên danh mục mới:
-                      </p>
-                      <Input
-                        value={formData.categoryName}
+                    </div>
+
+                    {/* Description */}
+                    <div className="space-y-2">
+                      <Label htmlFor="description">Mô tả</Label>
+                      <Textarea
+                        id="description"
+                        value={formData.description}
                         onChange={(e) =>
                           setFormData({
                             ...formData,
-                            categoryName: e.target.value,
-                            categoryId: "",
+                            description: e.target.value,
                           })
                         }
-                        placeholder="VD: coffee, tea, pastry"
-                        disabled={!!formData.categoryId}
+                        placeholder="Mô tả sản phẩm..."
+                        rows={3}
                       />
                     </div>
-                  )}
-                </div>
+                  </div>
 
-                {/* Price */}
-                <div className="space-y-2">
-                  <Label htmlFor="price">Giá (VND) *</Label>
-                  <Input
-                    id="price"
-                    type="number"
-                    min="0"
-                    value={formData.price}
-                    onChange={(e) =>
-                      setFormData({ ...formData, price: e.target.value })
-                    }
-                    placeholder="45000"
-                  />
-                </div>
+                  {/* Right Column - Image Upload */}
+                  <div className="space-y-4">
+                    <Label>Ảnh sản phẩm</Label>
 
-                {/* Stock */}
-                <div className="space-y-2">
-                  <Label htmlFor="amountLeft">Số lượng tồn kho *</Label>
-                  <Input
-                    id="amountLeft"
-                    type="number"
-                    min="0"
-                    value={formData.amountLeft}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        amountLeft: e.target.value,
-                      })
-                    }
-                    placeholder="100"
-                  />
-                </div>
+                    {/* Image Preview */}
+                    <div className="relative aspect-square w-full max-w-[180px] mx-auto rounded-xl overflow-hidden border-2 border-orange-200 bg-gray-50">
+                      {imagePreview ? (
+                        <>
+                          <img
+                            src={imagePreview}
+                            alt="Preview"
+                            className="w-full h-full object-cover"
+                          />
+                          <button
+                            type="button"
+                            onClick={handleRemoveImage}
+                            className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors shadow-lg"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </>
+                      ) : (
+                        <div className="w-full h-full flex flex-col items-center justify-center text-gray-400">
+                          <Package className="h-12 w-12 mb-2" />
+                          <span className="text-sm">Chưa có ảnh</span>
+                        </div>
+                      )}
+                    </div>
 
-                {/* Status */}
-                <div className="space-y-2">
-                  <Label>Trạng thái</Label>
-                  <Select
-                    value={formData.status}
-                    onValueChange={(value: any) =>
-                      setFormData({ ...formData, status: value })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="available">✅ Còn hàng</SelectItem>
-                      <SelectItem value="out of stock">⚠️ Hết hàng</SelectItem>
-                      <SelectItem value="discontinued">🚫 Ngừng bán</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Description */}
-                <div className="space-y-2">
-                  <Label htmlFor="description">Mô tả</Label>
-                  <Textarea
-                    id="description"
-                    value={formData.description}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        description: e.target.value,
-                      })
-                    }
-                    placeholder="Mô tả sản phẩm..."
-                    rows={3}
-                  />
-                </div>
-              </div>
-
-              {/* Right Column - Image Upload */}
-              <div className="space-y-4">
-                <Label>Ảnh sản phẩm</Label>
-
-                {/* Image Preview */}
-                <div className="relative aspect-square w-full max-w-[180px] mx-auto rounded-xl overflow-hidden border-2 border-orange-200 bg-gray-50">
-                  {imagePreview ? (
-                    <>
-                      <img
-                        src={imagePreview}
-                        alt="Preview"
-                        className="w-full h-full object-cover"
+                    {/* File Input */}
+                    <div className="flex flex-col items-center gap-2">
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageChange}
+                        className="hidden"
+                        id="image-upload"
                       />
-                      <button
+                      <Button
                         type="button"
-                        onClick={handleRemoveImage}
-                        className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors shadow-lg"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="flex items-center gap-2"
                       >
-                        <X className="h-4 w-4" />
-                      </button>
-                    </>
-                  ) : (
-                    <div className="w-full h-full flex flex-col items-center justify-center text-gray-400">
-                      <Package className="h-12 w-12 mb-2" />
-                      <span className="text-sm">Chưa có ảnh</span>
+                        <Upload className="h-4 w-4" />
+                        {imageFile
+                          ? "Đổi ảnh"
+                          : imagePreview
+                          ? "Thay ảnh"
+                          : "Chọn ảnh"}
+                      </Button>
+                      {imageFile && (
+                        <span className="text-xs text-gray-500 truncate max-w-[150px] text-center">
+                          {imageFile.name}
+                        </span>
+                      )}
+                      <p className="text-xs text-gray-400 text-center">
+                        JPG, PNG, GIF (max 5MB)
+                      </p>
                     </div>
-                  )}
+                  </div>
                 </div>
 
-                {/* File Input */}
-                <div className="flex flex-col items-center gap-2">
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageChange}
-                    className="hidden"
-                    id="image-upload"
-                  />
+                {error && (
+                  <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
+                    {error}
+                  </div>
+                )}
+
+                <div className="flex gap-3 pt-4 border-t">
                   <Button
-                    type="button"
                     variant="outline"
-                    size="sm"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="flex items-center gap-2"
+                    className="flex-1"
+                    onClick={handleCloseDialog}
+                    disabled={isSaving}
                   >
-                    <Upload className="h-4 w-4" />
-                    {imageFile
-                      ? "Đổi ảnh"
-                      : imagePreview
-                      ? "Thay ảnh"
-                      : "Chọn ảnh"}
+                    Hủy
                   </Button>
-                  {imageFile && (
-                    <span className="text-xs text-gray-500 truncate max-w-[150px] text-center">
-                      {imageFile.name}
-                    </span>
-                  )}
-                  <p className="text-xs text-gray-400 text-center">
-                    JPG, PNG, GIF (max 5MB)
-                  </p>
+                  <Button
+                    className="flex-1 bg-gradient-to-r from-orange-500 to-amber-600"
+                    onClick={handleSave}
+                    disabled={isSaving}
+                  >
+                    {isSaving ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Đang lưu...
+                      </>
+                    ) : (
+                      "Lưu"
+                    )}
+                  </Button>
                 </div>
-              </div>
-            </div>
+              </DialogContent>
+            </Dialog>
 
+            {/* Error Display */}
             {error && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
+              <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm">
                 {error}
               </div>
             )}
 
-            <div className="flex gap-3 pt-4 border-t">
+            {/* Filters */}
+            <Card className="p-6 border-2 border-orange-100">
+              <div className="flex gap-4 flex-wrap">
+                {/* Search */}
+                <div className="flex-1 min-w-[300px]">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-amber-600 h-5 w-5" />
+                    <Input
+                      placeholder="Tìm kiếm sản phẩm..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-10 border-orange-200 focus:border-orange-400"
+                    />
+                  </div>
+                </div>
+
+                {/* Category Filter */}
+                <div className="w-[200px]">
+                  <Select
+                    value={selectedCategory}
+                    onValueChange={setSelectedCategory}
+                  >
+                    <SelectTrigger className="border-orange-200">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Tất cả danh mục</SelectItem>
+                      {itemCategories.map((cat) => (
+                        <SelectItem key={String(cat)} value={String(cat)}>
+                          {translateCategory(String(cat))}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </Card>
+
+            {/* Items Grid */}
+            <ScrollArea className="h-[calc(100vh-320px)]">
+              {isLoading ? (
+                <div className="flex flex-col items-center justify-center py-12 space-y-4">
+                  <Loader2 className="h-12 w-12 animate-spin text-orange-500" />
+                  <div className="text-center">
+                    <p className="text-amber-900 font-medium mb-2">
+                      Đang tải sản phẩm...
+                    </p>
+                    <p className="text-amber-600 text-sm">
+                      Backend đang khởi động (30-50s nếu lần đầu)
+                    </p>
+                  </div>
+                </div>
+              ) : filteredItems.length === 0 ? (
+                <div className="text-center py-12">
+                  <Package className="h-12 w-12 text-amber-600/30 mx-auto mb-3" />
+                  <p className="text-amber-600/50">Không tìm thấy sản phẩm</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                  {filteredItems.map((item) => (
+                    <Card
+                      key={item.id}
+                      className="overflow-hidden hover:shadow-xl transition-all border-2 border-orange-100 hover:border-orange-300 rounded-2xl flex flex-col"
+                      style={{ height: "480px" }}
+                    >
+                      <div
+                        className="relative bg-gradient-to-br from-orange-50 to-amber-50 flex-shrink-0"
+                        style={{ height: "240px" }}
+                      >
+                        <ImageWithFallback
+                          src={
+                            item.image ||
+                            `https://images.unsplash.com/photo-1635090976010-d3f6dfbb1bac?w=400`
+                          }
+                          alt={item.name}
+                          className="w-full h-full object-cover"
+                        />
+                        {/* Status Badge */}
+                        <div className="absolute top-2 right-2">
+                          {item.status === "available" && (
+                            <Badge className="bg-green-500">Còn hàng</Badge>
+                          )}
+                          {item.status === "out of stock" && (
+                            <Badge className="bg-yellow-500">Hết hàng</Badge>
+                          )}
+                          {item.status === "discontinued" && (
+                            <Badge className="bg-red-500">Ngừng bán</Badge>
+                          )}
+                        </div>
+                      </div>
+                      <div
+                        className="p-4 flex flex-col"
+                        style={{ height: "240px" }}
+                      >
+                        <div className="flex-grow">
+                          <h4
+                            className="font-medium text-amber-900 mb-2 truncate"
+                            style={{ height: "24px", lineHeight: "24px" }}
+                          >
+                            {item.name}
+                          </h4>
+                          <p
+                            className="text-sm text-orange-600 mb-3 truncate"
+                            style={{ height: "20px", lineHeight: "20px" }}
+                          >
+                            {translateCategory(item.category?.name)}
+                          </p>
+                          <p
+                            className="text-lg font-semibold text-orange-600 mb-4"
+                            style={{ height: "28px", lineHeight: "28px" }}
+                          >
+                            {item.price.toLocaleString("vi-VN")}đ
+                          </p>
+                        </div>
+
+                        <div className="flex flex-col gap-2">
+                          <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="flex-1 border-orange-200 hover:bg-orange-50"
+                              onClick={() => handleOpenDialog(item)}
+                            >
+                              <Edit className="h-4 w-4 mr-1" />
+                              Sửa
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="border-red-200 hover:bg-red-50 text-red-600"
+                              onClick={() => handleDelete(item.id, item.name)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full border-amber-200 hover:bg-amber-50"
+                            onClick={() => handleViewRecipe(item)}
+                          >
+                            <ChefHat className="h-4 w-4 mr-1" />
+                            Xem công thức
+                          </Button>
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </ScrollArea>
+          </TabsContent>
+
+          {/* Categories Tab */}
+          <TabsContent
+            value="categories"
+            className="mt-0 bg-white p-6 border-2 border-t-0 border-orange-200 rounded-b-lg space-y-6"
+          >
+            {/* Header with Add Button */}
+            <div className="flex justify-end">
+              <Button
+                onClick={() => handleOpenCategoryDialog()}
+                className="bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white"
+              >
+                <Plus className="h-5 w-5 mr-2" />
+                Thêm danh mục
+              </Button>
+            </div>
+
+            {/* Category Dialog */}
+            <Dialog
+              open={isCategoryDialogOpen}
+              onOpenChange={setIsCategoryDialogOpen}
+            >
+              <DialogContent className="sm:max-w-[500px]">
+                <DialogHeader>
+                  <DialogTitle>
+                    {editingCategory
+                      ? "Chỉnh sửa danh mục"
+                      : "Thêm danh mục mới"}
+                  </DialogTitle>
+                  <DialogDescription>
+                    {editingCategory
+                      ? "Cập nhật thông tin danh mục"
+                      : "Nhập thông tin danh mục mới"}
+                  </DialogDescription>
+                </DialogHeader>
+
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="categoryName">Tên danh mục *</Label>
+                    <Input
+                      id="categoryName"
+                      value={categoryFormData.name}
+                      onChange={(e) =>
+                        setCategoryFormData({
+                          ...categoryFormData,
+                          name: e.target.value,
+                        })
+                      }
+                      placeholder="VD: Cà phê, Trà sữa, Smoothie..."
+                      className="border-purple-200"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-3">
+                  <Button
+                    variant="outline"
+                    onClick={handleCloseCategoryDialog}
+                    disabled={isSaving}
+                  >
+                    Hủy
+                  </Button>
+                  <Button
+                    onClick={handleSaveCategory}
+                    disabled={isSaving}
+                    className="bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white"
+                  >
+                    {isSaving ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Đang lưu...
+                      </>
+                    ) : editingCategory ? (
+                      "Cập nhật"
+                    ) : (
+                      "Thêm"
+                    )}
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+
+            {/* Categories List */}
+            <div>
+              <h3 className="font-semibold text-amber-900 mb-3">
+                Danh sách danh mục ({categories.length})
+              </h3>
+              {isLoadingCategories ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-purple-500" />
+                  <span className="ml-3 text-amber-900">Đang tải...</span>
+                </div>
+              ) : categories.length === 0 ? (
+                <div className="text-center py-12">
+                  <Package className="h-12 w-12 text-amber-600/30 mx-auto mb-3" />
+                  <p className="text-amber-600">Chưa có danh mục nào</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {categories.map((category) => {
+                    const itemCount = items.filter(
+                      (item) => item.category?.id === category.id
+                    ).length;
+
+                    return (
+                      <Card
+                        key={category.id}
+                        className="p-4 border-2 border-purple-100 hover:shadow-lg transition-all"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1">
+                            <h4 className="font-semibold text-amber-900 mb-1">
+                              {category.name}
+                            </h4>
+                            {category.description && (
+                              <p className="text-sm text-amber-600 mb-2">
+                                {category.description}
+                              </p>
+                            )}
+                            <p className="text-xs text-amber-700/70">
+                              {itemCount} sản phẩm
+                            </p>
+                          </div>
+                          <div className="flex gap-1">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleOpenCategoryDialog(category)}
+                              className="border-purple-200 hover:bg-purple-50"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() =>
+                                handleDeleteCategory(category.id, category.name)
+                              }
+                              className="border-red-200 hover:bg-red-50 text-red-600"
+                              disabled={itemCount > 0}
+                              title={
+                                itemCount > 0
+                                  ? "Không thể xóa danh mục đang có sản phẩm"
+                                  : "Xóa danh mục"
+                              }
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      </Card>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </TabsContent>
+
+          {/* Recipes Tab */}
+          <TabsContent
+            value="recipes"
+            className="mt-0 bg-white p-6 border-2 border-t-0 border-orange-200 rounded-b-lg space-y-6"
+          >
+            {/* Header with Add Button */}
+            <div className="flex justify-between items-center">
+              <div>
+                <h3 className="text-lg font-semibold text-amber-900">
+                  Quản lý công thức ({allRecipes.length})
+                </h3>
+                <p className="text-sm text-amber-700/70">
+                  Tạo và quản lý công thức pha chế cho các món
+                </p>
+              </div>
+              <Button
+                onClick={() => {
+                  setEditingRecipeInTab(null);
+                  setRecipeTabFormData({
+                    name: "",
+                    description: "",
+                    itemId: "",
+                    ingredients: [],
+                  });
+                  loadIngredients(); // Load ingredients when opening form
+                  setIsRecipeTabFormOpen(true);
+                }}
+                className="bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Thêm công thức
+              </Button>
+            </div>
+
+            {/* Recipes List */}
+            {isLoadingAllRecipes ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
+                <span className="ml-3 text-amber-900">
+                  Đang tải công thức...
+                </span>
+              </div>
+            ) : allRecipes.length === 0 ? (
+              <div className="text-center py-12">
+                <ChefHat className="h-16 w-16 text-amber-600/30 mx-auto mb-4" />
+                <p className="text-amber-600 mb-2">Chưa có công thức nào</p>
+                <p className="text-sm text-amber-600/70">
+                  Nhấn "Thêm công thức" để tạo công thức mới
+                </p>
+              </div>
+            ) : (
+              <div className="grid gap-4">
+                {allRecipes.map((recipe) => (
+                  <Card
+                    key={recipe.id}
+                    className="p-4 border-2 border-orange-100 hover:shadow-lg transition-all"
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-2">
+                          <ChefHat className="h-5 w-5 text-orange-500" />
+                          <div>
+                            <h4 className="font-semibold text-amber-900">
+                              {recipe.name}
+                            </h4>
+                            <p className="text-sm text-amber-600">
+                              Món: {recipe.item?.name || "N/A"}
+                            </p>
+                          </div>
+                        </div>
+                        {recipe.description && (
+                          <p className="text-sm text-amber-700/70 mb-3">
+                            {recipe.description}
+                          </p>
+                        )}
+                        <div className="space-y-1">
+                          <p className="text-xs font-semibold text-amber-800">
+                            Nguyên liệu ({recipe.recipeIngredients?.length || 0}
+                            ):
+                          </p>
+                          <div className="flex flex-wrap gap-2">
+                            {recipe.recipeIngredients?.map((ri) => (
+                              <Badge
+                                key={ri.id}
+                                variant="outline"
+                                className="bg-orange-50 border-orange-200 text-amber-800"
+                              >
+                                {ri.ingredient.name}: {ri.amount}{" "}
+                                {ri.ingredient.measureUnit}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={async () => {
+                            setEditingRecipeInTab(recipe);
+                            setRecipeTabFormData({
+                              name: recipe.name,
+                              description: recipe.description || "",
+                              itemId: recipe.item?.id || "",
+                              ingredients: recipe.recipeIngredients.map(
+                                (ri) => ({
+                                  ingredientId: ri.ingredient.id,
+                                  amount: ri.amount,
+                                })
+                              ),
+                            });
+                            await loadIngredients();
+                            setIsRecipeTabFormOpen(true);
+                          }}
+                          className="border-orange-200 hover:bg-orange-50"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={async () => {
+                            if (
+                              window.confirm(
+                                `Bạn có chắc muốn xóa công thức "${recipe.name}"?`
+                              )
+                            ) {
+                              try {
+                                await recipesApi.delete(recipe.id);
+                                await loadAllRecipes();
+                              } catch (err: any) {
+                                alert(
+                                  err.response?.data?.message ||
+                                    "Không thể xóa công thức!"
+                                );
+                              }
+                            }
+                          }}
+                          className="border-red-200 hover:bg-red-50 text-red-600"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
+
+        {/* Recipe Tab Form Dialog */}
+        <Dialog
+          open={isRecipeTabFormOpen}
+          onOpenChange={setIsRecipeTabFormOpen}
+        >
+          <DialogContent className="max-w-6xl w-[95vw] h-[75vh] !bg-white dark:bg-zinc-900 p-0 overflow-hidden rounded-2xl border-orange-100 dark:border-zinc-800">
+            {/* Header */}
+            <div className="flex items-center justify-between px-8 py-5 border-b border-orange-100 dark:border-zinc-800 bg-white dark:bg-zinc-800/50">
+              <div>
+                <DialogTitle className="text-2xl font-bold text-amber-900 dark:text-white">
+                  {editingRecipeInTab
+                    ? "Chỉnh sửa công thức"
+                    : "Thêm công thức mới"}
+                </DialogTitle>
+                <p className="text-sm text-amber-700/70 dark:text-amber-500/70 mt-1">
+                  Cập nhật thành phần và định lượng cho món:{" "}
+                  <span className="font-semibold text-orange-600">
+                    {items.find((i) => i.id === recipeTabFormData.itemId)
+                      ?.name || "Chưa chọn món"}
+                  </span>
+                </p>
+              </div>
+              <Button
+                variant="ghost"
+                className="p-2 rounded-full hover:bg-orange-50 dark:hover:bg-zinc-700 text-gray-400 hover:text-orange-600 transition-colors"
+                onClick={() => setIsRecipeTabFormOpen(false)}
+              >
+                <X className="h-6 w-6" />
+              </Button>
+            </div>
+
+            {/* Body */}
+            <div className="flex-1 overflow-y-auto p-8 custom-scrollbar !bg-orange-50/20 dark:bg-[#18181b]/50">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 h-full">
+                {/* Left Column - Info */}
+                <div className="lg:col-span-1 flex flex-col gap-6">
+                  <div className="bg-white dark:bg-zinc-800 p-6 rounded-xl shadow-sm border border-orange-100 dark:border-zinc-700">
+                    <h4 className="font-bold text-lg text-amber-900 dark:text-white mb-4 flex items-center gap-2">
+                      <Info className="h-5 w-5 text-orange-500" />
+                      Thông tin chi tiết
+                    </h4>
+                    <div className="space-y-5">
+                      {/* Recipe Name */}
+                      <div>
+                        <Label className="block text-sm font-medium text-amber-800 dark:text-amber-200 mb-2">
+                          Tên công thức <span className="text-red-500">*</span>
+                        </Label>
+                        <Input
+                          value={recipeTabFormData.name}
+                          onChange={(e) =>
+                            setRecipeTabFormData({
+                              ...recipeTabFormData,
+                              name: e.target.value,
+                            })
+                          }
+                          className="bg-orange-50/30 dark:bg-zinc-900 border-orange-100 dark:border-zinc-700 focus:ring-orange-500 focus:border-orange-500"
+                          placeholder="Nhập tên công thức..."
+                        />
+                      </div>
+
+                      {/* Select Item */}
+                      <div>
+                        <Label className="block text-sm font-medium text-amber-800 dark:text-amber-200 mb-2">
+                          Chọn món <span className="text-red-500">*</span>
+                        </Label>
+                        <div className="relative">
+                          <Select
+                            value={recipeTabFormData.itemId}
+                            onValueChange={(value) =>
+                              setRecipeTabFormData({
+                                ...recipeTabFormData,
+                                itemId: value,
+                              })
+                            }
+                            disabled={!!editingRecipeInTab}
+                          >
+                            <SelectTrigger className="w-full bg-orange-50/30 dark:bg-zinc-900 border border-orange-100 dark:border-zinc-700 rounded-lg py-2.5 px-3 focus:ring-orange-500 focus:border-orange-500 text-amber-900 dark:text-white text-sm">
+                              <SelectValue placeholder="Chọn món" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {items.map((item) => (
+                                <SelectItem key={item.id} value={item.id}>
+                                  {item.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right Column - Ingredients */}
+                <div className="lg:col-span-2 flex flex-col gap-6">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-bold text-lg text-amber-900 dark:text-white flex items-center gap-2">
+                      <Refrigerator className="h-5 w-5 text-orange-500" />
+                      Nguyên liệu thành phần
+                      <span className="bg-orange-100 dark:bg-orange-900/30 text-orange-600 text-xs px-2 py-0.5 rounded-full">
+                        {recipeTabFormData.ingredients.length} items
+                      </span>
+                    </h4>
+                    <Button
+                      onClick={() =>
+                        setRecipeTabFormData({
+                          ...recipeTabFormData,
+                          ingredients: [
+                            ...recipeTabFormData.ingredients,
+                            { ingredientId: "", amount: 0 },
+                          ],
+                        })
+                      }
+                      className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium shadow-sm transition-all active:scale-95"
+                    >
+                      <Plus className="h-4 w-4" />
+                      Thêm nguyên liệu
+                    </Button>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {recipeTabFormData.ingredients.map((ing, index) => (
+                      <div
+                        key={index}
+                        className="bg-white dark:bg-zinc-800 p-4 rounded-xl border border-orange-100 dark:border-zinc-700 hover:border-orange-500 dark:hover:border-orange-500 transition-colors group relative"
+                      >
+                        <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+                          <button
+                            onClick={() => {
+                              const newIngredients = [
+                                ...recipeTabFormData.ingredients,
+                              ];
+                              newIngredients.splice(index, 1);
+                              setRecipeTabFormData({
+                                ...recipeTabFormData,
+                                ingredients: newIngredients,
+                              });
+                            }}
+                            className="p-1.5 text-gray-400 hover:text-red-500 rounded-full hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                        <div className="flex items-start gap-4">
+                          <div className="w-10 h-10 rounded-lg bg-orange-100 dark:bg-zinc-700 flex items-center justify-center text-orange-600 flex-shrink-0">
+                            <Coffee className="h-5 w-5" />
+                          </div>
+                          <div className="flex-1 space-y-3">
+                            <div>
+                              <Label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">
+                                Nguyên liệu
+                              </Label>
+                              <Select
+                                value={ing.ingredientId}
+                                onValueChange={(value) => {
+                                  const newIngredients = [
+                                    ...recipeTabFormData.ingredients,
+                                  ];
+                                  newIngredients[index].ingredientId = value;
+                                  setRecipeTabFormData({
+                                    ...recipeTabFormData,
+                                    ingredients: newIngredients,
+                                  });
+                                }}
+                              >
+                                <SelectTrigger className="w-full bg-transparent border-0 border-b border-gray-200 dark:border-zinc-700 py-1 px-0 text-sm font-semibold text-amber-900 dark:text-white focus:ring-0 focus:border-orange-500 h-auto rounded-none shadow-none">
+                                  <SelectValue placeholder="Chọn nguyên liệu" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {ingredients.map((i) => (
+                                    <SelectItem key={i.id} value={i.id}>
+                                      {i.name} ({i.measureUnit})
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <div className="flex-1">
+                                <Label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">
+                                  Số lượng
+                                </Label>
+                                <Input
+                                  type="number"
+                                  value={ing.amount}
+                                  onChange={(e) => {
+                                    const newIngredients = [
+                                      ...recipeTabFormData.ingredients,
+                                    ];
+                                    newIngredients[index].amount = Number(
+                                      e.target.value
+                                    );
+                                    setRecipeTabFormData({
+                                      ...recipeTabFormData,
+                                      ingredients: newIngredients,
+                                    });
+                                  }}
+                                  className="w-full bg-gray-50 dark:bg-zinc-900 border-none rounded-md py-1.5 px-3 text-sm font-medium focus:ring-2 focus:ring-orange-500/50"
+                                />
+                              </div>
+                              <span className="text-sm text-gray-500 dark:text-gray-400 mt-5">
+                                {ingredients.find(
+                                  (i) => i.id === ing.ingredientId
+                                )?.measureUnit || "đơn vị"}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+
+                    {/* Add New Card Button */}
+                    <button
+                      onClick={() =>
+                        setRecipeTabFormData({
+                          ...recipeTabFormData,
+                          ingredients: [
+                            ...recipeTabFormData.ingredients,
+                            { ingredientId: "", amount: 0 },
+                          ],
+                        })
+                      }
+                      className="bg-transparent border-2 border-dashed border-gray-200 dark:border-zinc-700 p-4 rounded-xl flex flex-col items-center justify-center gap-2 hover:border-orange-500 hover:bg-orange-50/30 dark:hover:bg-zinc-800 transition-all group min-h-[160px]"
+                    >
+                      <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-zinc-800 flex items-center justify-center text-gray-400 group-hover:text-orange-500 group-hover:bg-white dark:group-hover:bg-zinc-700 transition-colors">
+                        <Plus className="h-5 w-5" />
+                      </div>
+                      <span className="text-sm font-medium text-gray-500 dark:text-gray-400 group-hover:text-orange-500">
+                        Thêm thành phần khác
+                      </span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="px-8 py-5 border-t border-orange-100 dark:border-zinc-800 bg-white dark:bg-zinc-800 flex justify-end gap-4">
               <Button
                 variant="outline"
-                className="flex-1"
-                onClick={handleCloseDialog}
-                disabled={isSaving}
+                onClick={() => setIsRecipeTabFormOpen(false)}
+                className="px-6 py-2.5 rounded-lg border border-gray-200 dark:border-zinc-700 text-gray-600 dark:text-gray-300 font-medium hover:bg-gray-50 dark:hover:bg-zinc-700 transition-colors h-auto"
               >
                 Hủy
               </Button>
               <Button
-                className="flex-1 bg-gradient-to-r from-orange-500 to-amber-600"
-                onClick={handleSave}
+                onClick={async () => {
+                  if (!recipeTabFormData.name.trim()) {
+                    alert("Vui lòng nhập tên công thức!");
+                    return;
+                  }
+                  if (!recipeTabFormData.itemId) {
+                    alert("Vui lòng chọn món!");
+                    return;
+                  }
+
+                  setIsSaving(true);
+                  try {
+                    if (editingRecipeInTab) {
+                      await recipesApi.update(editingRecipeInTab.id, {
+                        name: recipeTabFormData.name,
+                        description: recipeTabFormData.description,
+                        ingredients: recipeTabFormData.ingredients,
+                      });
+                      alert("Cập nhật công thức thành công!");
+                    } else {
+                      await recipesApi.create({
+                        name: recipeTabFormData.name,
+                        description: recipeTabFormData.description,
+                        itemId: recipeTabFormData.itemId,
+                        ingredients: recipeTabFormData.ingredients,
+                      });
+                      alert("Thêm công thức thành công!");
+                    }
+                    await loadAllRecipes();
+                    setIsRecipeTabFormOpen(false);
+                    setEditingRecipeInTab(null);
+                    setRecipeTabFormData({
+                      name: "",
+                      description: "",
+                      itemId: "",
+                      ingredients: [],
+                    });
+                  } catch (err: any) {
+                    alert(
+                      err.response?.data?.message || "Không thể lưu công thức!"
+                    );
+                  } finally {
+                    setIsSaving(false);
+                  }
+                }}
+                className="px-6 py-2.5 rounded-lg bg-orange-500 text-white font-medium shadow-lg shadow-orange-200/50 dark:shadow-none hover:bg-orange-600 hover:scale-[1.02] transition-all h-auto"
                 disabled={isSaving}
               >
-                {isSaving ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Đang lưu...
-                  </>
-                ) : (
-                  "Lưu"
-                )}
+                <div className="flex items-center gap-2">
+                  {isSaving ? (
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                  ) : (
+                    <Save className="h-5 w-5" />
+                  )}
+                  {isSaving ? "Đang lưu..." : "Lưu công thức"}
+                </div>
               </Button>
             </div>
           </DialogContent>
         </Dialog>
 
-        {/* Error Display */}
-        {error && (
-          <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm">
-            {error}
-          </div>
-        )}
-
-        {/* Filters */}
-        <Card className="p-6 border-2 border-orange-100">
-          <div className="flex gap-4 flex-wrap">
-            {/* Search */}
-            <div className="flex-1 min-w-[300px]">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-amber-600 h-5 w-5" />
-                <Input
-                  placeholder="Tìm kiếm sản phẩm..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 border-orange-200 focus:border-orange-400"
-                />
-              </div>
-            </div>
-
-            {/* Category Filter */}
-            <div className="w-[200px]">
-              <Select
-                value={selectedCategory}
-                onValueChange={setSelectedCategory}
-              >
-                <SelectTrigger className="border-orange-200">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Tất cả danh mục</SelectItem>
-                  {itemCategories.map((cat) => (
-                    <SelectItem key={String(cat)} value={String(cat)}>
-                      {translateCategory(String(cat))}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </Card>
-
-        {/* Items Grid */}
-        <ScrollArea className="h-[calc(100vh-320px)]">
-          {isLoading ? (
-            <div className="flex flex-col items-center justify-center py-12 space-y-4">
-              <Loader2 className="h-12 w-12 animate-spin text-orange-500" />
-              <div className="text-center">
-                <p className="text-amber-900 font-medium mb-2">
-                  Đang tải sản phẩm...
-                </p>
-                <p className="text-amber-600 text-sm">
-                  Backend đang khởi động (30-50s nếu lần đầu)
-                </p>
-              </div>
-            </div>
-          ) : filteredItems.length === 0 ? (
-            <div className="text-center py-12">
-              <Package className="h-12 w-12 text-amber-600/30 mx-auto mb-3" />
-              <p className="text-amber-600/50">Không tìm thấy sản phẩm</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-              {filteredItems.map((item) => (
-                <Card
-                  key={item.id}
-                  className="overflow-hidden hover:shadow-xl transition-all border-2 border-orange-100 hover:border-orange-300 rounded-2xl flex flex-col"
-                >
-                  <div className="aspect-square relative bg-gradient-to-br from-orange-50 to-amber-50 flex-shrink-0">
-                    <ImageWithFallback
-                      src={
-                        item.image ||
-                        `https://images.unsplash.com/photo-1635090976010-d3f6dfbb1bac?w=400`
-                      }
-                      alt={item.name}
-                      className="w-full h-full object-cover"
-                    />
-                    {/* Status Badge */}
-                    <div className="absolute top-2 right-2">
-                      {item.status === "available" && (
-                        <Badge className="bg-green-500">Còn hàng</Badge>
-                      )}
-                      {item.status === "out of stock" && (
-                        <Badge className="bg-yellow-500">Hết hàng</Badge>
-                      )}
-                      {item.status === "discontinued" && (
-                        <Badge className="bg-red-500">Ngừng bán</Badge>
-                      )}
-                    </div>
-                  </div>
-                  <div className="p-4">
-                    <h4 className="font-medium text-amber-900 mb-1 truncate">
-                      {item.name}
-                    </h4>
-                    <p className="text-sm text-orange-600 mb-2 truncate">
-                      {translateCategory(item.category?.name)}
-                    </p>
-                    <p className="text-lg font-semibold text-orange-600 mb-3">
-                      {item.price.toLocaleString("vi-VN")}đ
-                    </p>
-
-                    <div className="flex flex-col gap-2">
-                      <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="flex-1 border-orange-200 hover:bg-orange-50"
-                          onClick={() => handleOpenDialog(item)}
-                        >
-                          <Edit className="h-4 w-4 mr-1" />
-                          Sửa
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="border-red-200 hover:bg-red-50 text-red-600"
-                          onClick={() => handleDelete(item.id, item.name)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="w-full border-amber-200 hover:bg-amber-50"
-                        onClick={() => handleViewRecipe(item)}
-                      >
-                        <ChefHat className="h-4 w-4 mr-1" />
-                        Xem công thức
-                      </Button>
-                    </div>
-                  </div>
-                </Card>
-              ))}
-            </div>
-          )}
-        </ScrollArea>
-
         {/* Recipe Dialog */}
         <Dialog open={isRecipeDialogOpen} onOpenChange={setIsRecipeDialogOpen}>
-          <DialogContent className="max-w-2xl w-[600px]">
+          <DialogContent className="max-w-3xl w-[700px]">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <ChefHat className="h-5 w-5 text-orange-500" />
                 Công thức: {selectedItemForRecipe?.name}
               </DialogTitle>
               <DialogDescription>
-                Danh sách nguyên liệu và công thức pha chế
+                Quản lý công thức pha chế cho món này
               </DialogDescription>
             </DialogHeader>
 
@@ -838,7 +1809,16 @@ export function MenuManagement() {
               ) : recipes.length === 0 ? (
                 <div className="text-center py-12">
                   <ChefHat className="h-12 w-12 text-amber-600/30 mx-auto mb-3" />
-                  <p className="text-amber-600">Món này không có công thức</p>
+                  <p className="text-amber-600 mb-4">
+                    Món này chưa có công thức
+                  </p>
+                  <Button
+                    onClick={() => handleOpenRecipeForm()}
+                    className="bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Thêm công thức
+                  </Button>
                 </div>
               ) : (
                 <div className="space-y-4 py-4">
@@ -847,11 +1827,43 @@ export function MenuManagement() {
                       key={recipe.id}
                       className="p-4 border-2 border-orange-100"
                     >
-                      <div className="space-y-3">
+                      <div className="flex items-start justify-between mb-3">
+                        <div>
+                          <h4 className="font-semibold text-amber-900 text-lg">
+                            {recipe.name}
+                          </h4>
+                          {recipe.description && (
+                            <p className="text-sm text-amber-600 mt-1">
+                              {recipe.description}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleOpenRecipeForm(recipe)}
+                            className="border-orange-200 hover:bg-orange-50"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() =>
+                              handleDeleteRecipe(recipe.id, recipe.name)
+                            }
+                            className="border-red-200 hover:bg-red-50 text-red-600"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
                         {recipe.recipeIngredients.map((recipeIng) => (
                           <div
                             key={recipeIng.id}
-                            className="flex items-center justify-between py-2 border-b border-orange-50 last:border-0"
+                            className="flex items-center justify-between py-2 px-3 bg-orange-50 rounded-lg"
                           >
                             <div className="flex items-center gap-3">
                               <div className="h-10 w-10 rounded-full bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center">
@@ -877,6 +1889,15 @@ export function MenuManagement() {
             </ScrollArea>
 
             <div className="flex gap-3 pt-4 border-t">
+              {recipes.length > 0 && (
+                <Button
+                  onClick={() => handleOpenRecipeForm()}
+                  className="bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Thêm công thức
+                </Button>
+              )}
               <Button
                 variant="outline"
                 className="flex-1"
@@ -884,6 +1905,356 @@ export function MenuManagement() {
               >
                 Đóng
               </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Recipe Form Dialog */}
+        <Dialog
+          open={isRecipeFormDialogOpen}
+          onOpenChange={setIsRecipeFormDialogOpen}
+        >
+          <DialogContent className="max-w-5xl w-[90vw] h-[80vh] !bg-white p-0 overflow-hidden rounded-2xl border-2 border-orange-200">
+            {/* Header */}
+            <div className="flex items-center justify-between px-8 py-6 border-b-2 border-orange-200 bg-white">
+              <div className="flex-1">
+                <DialogTitle className="text-2xl font-bold text-amber-900 flex items-center gap-3">
+                  <div className="p-2 bg-gradient-to-br from-orange-500 to-amber-600 rounded-xl">
+                    <ChefHat className="h-6 w-6 text-white" />
+                  </div>
+                  {editingRecipe ? "Chỉnh sửa công thức" : "Thêm công thức mới"}
+                </DialogTitle>
+                <DialogDescription className="text-base text-amber-700/80 mt-2 ml-14">
+                  {editingRecipe
+                    ? "Cập nhật thông tin và nguyên liệu cho công thức"
+                    : `Tạo công thức pha chế cho món: `}
+                  <span className="font-semibold text-orange-600">
+                    {selectedItemForRecipe?.name}
+                  </span>
+                </DialogDescription>
+              </div>
+              <Button
+                variant="ghost"
+                className="p-2 rounded-full hover:bg-orange-100 text-gray-400 hover:text-orange-600 transition-all"
+                onClick={handleCloseRecipeForm}
+              >
+                <X className="h-6 w-6" />
+              </Button>
+            </div>
+
+            {/* Body - 2 Column Layout */}
+            <div className="flex-1 overflow-y-auto p-8 !bg-orange-50/20">
+              <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 h-full">
+                {/* Left Column - Recipe Info (2 parts) */}
+                <div className="lg:col-span-2 flex flex-col gap-6">
+                  <div className="bg-white p-6 rounded-2xl shadow-sm border-2 border-orange-100">
+                    <h4 className="font-bold text-lg text-amber-900 mb-4 flex items-center gap-2">
+                      <Info className="h-5 w-5 text-orange-500" />
+                      Thông tin cơ bản
+                    </h4>
+                    <div className="space-y-5">
+                      {/* Recipe Name */}
+                      <div className="space-y-2">
+                        <Label
+                          htmlFor="recipeName"
+                          className="text-sm font-semibold text-amber-800"
+                        >
+                          Tên công thức *
+                        </Label>
+                        <Input
+                          id="recipeName"
+                          value={recipeFormData.name}
+                          onChange={(e) =>
+                            setRecipeFormData({
+                              ...recipeFormData,
+                              name: e.target.value,
+                            })
+                          }
+                          placeholder="VD: Công thức Cappuccino truyền thống"
+                          className="bg-orange-50/40 border-orange-200 focus:border-orange-500 focus:ring-orange-500/20 h-11"
+                        />
+                      </div>
+
+                      {/* Recipe Description */}
+                      <div className="space-y-2">
+                        <Label
+                          htmlFor="recipeDescription"
+                          className="text-sm font-semibold text-amber-800"
+                        >
+                          Mô tả công thức
+                        </Label>
+                        <Textarea
+                          id="recipeDescription"
+                          value={recipeFormData.description}
+                          onChange={(e) =>
+                            setRecipeFormData({
+                              ...recipeFormData,
+                              description: e.target.value,
+                            })
+                          }
+                          placeholder="Mô tả chi tiết về công thức, cách pha chế, lưu ý đặc biệt..."
+                          rows={6}
+                          className="bg-orange-50/40 border-orange-200 focus:border-orange-500 focus:ring-orange-500/20 resize-none"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Stats Card */}
+                  <div className="bg-gradient-to-br from-orange-500 to-amber-600 p-6 rounded-2xl shadow-lg text-white">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="p-2 bg-white/20 rounded-lg">
+                        <Refrigerator className="h-5 w-5" />
+                      </div>
+                      <h4 className="font-bold text-lg">
+                        Tổng quan nguyên liệu
+                      </h4>
+                    </div>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between bg-white/10 p-3 rounded-xl">
+                        <span className="text-sm font-medium">
+                          Số lượng nguyên liệu:
+                        </span>
+                        <span className="text-2xl font-bold">
+                          {recipeFormData.ingredients.length}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between bg-white/10 p-3 rounded-xl">
+                        <span className="text-sm font-medium">
+                          Đã chọn đầy đủ:
+                        </span>
+                        <span className="text-lg font-semibold">
+                          {
+                            recipeFormData.ingredients.filter(
+                              (ing) => ing.ingredientId && ing.amount > 0
+                            ).length
+                          }{" "}
+                          / {recipeFormData.ingredients.length}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right Column - Ingredients List (3 parts) */}
+                <div className="lg:col-span-3 flex flex-col gap-4">
+                  <div className="flex items-center justify-between sticky top-0 !bg-orange-50/20 pb-4 z-10">
+                    <h4 className="font-bold text-lg text-amber-900 flex items-center gap-2">
+                      <Refrigerator className="h-5 w-5 text-orange-500" />
+                      Danh sách nguyên liệu
+                      <span className="bg-orange-500 text-white text-xs px-3 py-1 rounded-full font-bold">
+                        {recipeFormData.ingredients.length} items
+                      </span>
+                    </h4>
+                    <Button
+                      onClick={handleAddRecipeIngredient}
+                      className="bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white px-5 py-2.5 rounded-xl flex items-center gap-2 text-sm font-semibold shadow-lg shadow-orange-200 hover:shadow-xl hover:scale-105 transition-all"
+                    >
+                      <Plus className="h-4 w-4" />
+                      Thêm nguyên liệu
+                    </Button>
+                  </div>
+
+                  <ScrollArea
+                    className="flex-1 pr-4"
+                    style={{ maxHeight: "calc(80vh - 280px)" }}
+                  >
+                    <div className="space-y-3">
+                      {recipeFormData.ingredients.map((ing, index) => {
+                        const selectedIngredient = ingredients.find(
+                          (i) => i.id === ing.ingredientId
+                        );
+                        return (
+                          <Card
+                            key={index}
+                            className="p-5 border-2 border-orange-100 hover:border-orange-300 hover:shadow-lg transition-all bg-white rounded-xl group"
+                          >
+                            <div className="flex items-start gap-4">
+                              {/* Number Badge */}
+                              <div className="flex-shrink-0 w-10 h-10 bg-gradient-to-br from-orange-500 to-amber-600 rounded-xl flex items-center justify-center text-white font-bold shadow-md">
+                                {index + 1}
+                              </div>
+
+                              {/* Form Fields */}
+                              <div className="flex-1 grid grid-cols-2 gap-4">
+                                {/* Ingredient Select */}
+                                <div className="space-y-2">
+                                  <Label className="text-xs font-semibold text-amber-800 uppercase tracking-wide">
+                                    Nguyên liệu *
+                                  </Label>
+                                  <Select
+                                    value={ing.ingredientId}
+                                    onValueChange={(value) =>
+                                      handleUpdateRecipeIngredient(
+                                        index,
+                                        "ingredientId",
+                                        value
+                                      )
+                                    }
+                                  >
+                                    <SelectTrigger className="bg-orange-50/40 border-orange-200 focus:border-orange-500 h-11">
+                                      <SelectValue placeholder="Chọn nguyên liệu">
+                                        {selectedIngredient ? (
+                                          <div className="flex items-center gap-2">
+                                            <Refrigerator className="h-4 w-4 text-orange-500" />
+                                            <span className="font-medium">
+                                              {selectedIngredient.name}
+                                            </span>
+                                          </div>
+                                        ) : (
+                                          "Chọn nguyên liệu"
+                                        )}
+                                      </SelectValue>
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {ingredients.map((ingredient) => (
+                                        <SelectItem
+                                          key={ingredient.id}
+                                          value={ingredient.id}
+                                        >
+                                          <div className="flex items-center justify-between w-full gap-3">
+                                            <span className="font-medium">
+                                              {ingredient.name}
+                                            </span>
+                                            <span className="text-xs text-gray-500">
+                                              ({ingredient.measureUnit})
+                                            </span>
+                                          </div>
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+
+                                {/* Amount Input */}
+                                <div className="space-y-2">
+                                  <Label className="text-xs font-semibold text-amber-800 uppercase tracking-wide">
+                                    Số lượng * (
+                                    {selectedIngredient?.measureUnit ||
+                                      "đơn vị"}
+                                    )
+                                  </Label>
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    value={ing.amount || ""}
+                                    onChange={(e) =>
+                                      handleUpdateRecipeIngredient(
+                                        index,
+                                        "amount",
+                                        parseFloat(e.target.value) || 0
+                                      )
+                                    }
+                                    placeholder="0.00"
+                                    className="bg-orange-50/40 border-orange-200 focus:border-orange-500 h-11"
+                                  />
+                                </div>
+                              </div>
+
+                              {/* Delete Button */}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() =>
+                                  handleRemoveRecipeIngredient(index)
+                                }
+                                className="flex-shrink-0 h-10 w-10 p-0 rounded-xl hover:bg-red-50 text-gray-400 hover:text-red-600 transition-all opacity-0 group-hover:opacity-100"
+                              >
+                                <Trash2 className="h-5 w-5" />
+                              </Button>
+                            </div>
+
+                            {/* Stock Info */}
+                            {selectedIngredient && (
+                              <div className="mt-3 pt-3 border-t border-orange-100 flex items-center gap-2 text-sm">
+                                <div className="flex items-center gap-2 text-amber-700">
+                                  <Package className="h-4 w-4" />
+                                  <span className="font-medium">Tồn kho:</span>
+                                  <span className="font-bold text-orange-600">
+                                    {selectedIngredient.amountLeft}{" "}
+                                    {selectedIngredient.measureUnit}
+                                  </span>
+                                </div>
+                              </div>
+                            )}
+                          </Card>
+                        );
+                      })}
+
+                      {/* Empty State or Add More Button */}
+                      {recipeFormData.ingredients.length === 0 ? (
+                        <div className="text-center py-16 bg-white border-2 border-dashed border-orange-200 rounded-2xl">
+                          <div className="p-4 bg-orange-50 rounded-full w-20 h-20 mx-auto mb-4 flex items-center justify-center">
+                            <Refrigerator className="h-10 w-10 text-orange-400" />
+                          </div>
+                          <p className="text-amber-600 font-medium mb-2">
+                            Chưa có nguyên liệu nào
+                          </p>
+                          <p className="text-sm text-amber-600/70 mb-4">
+                            Nhấn "Thêm nguyên liệu" để bắt đầu
+                          </p>
+                          <Button
+                            onClick={handleAddRecipeIngredient}
+                            className="bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white"
+                          >
+                            <Plus className="h-4 w-4 mr-2" />
+                            Thêm nguyên liệu đầu tiên
+                          </Button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={handleAddRecipeIngredient}
+                          className="w-full bg-white border-2 border-dashed border-orange-200 p-6 rounded-xl flex flex-col items-center justify-center gap-2 hover:border-orange-400 hover:bg-orange-50/30 transition-all group"
+                        >
+                          <div className="p-3 bg-orange-100 group-hover:bg-orange-200 rounded-full transition-colors">
+                            <Plus className="h-6 w-6 text-orange-600" />
+                          </div>
+                          <span className="text-sm font-semibold text-amber-700 group-hover:text-orange-600 transition-colors">
+                            Thêm nguyên liệu khác
+                          </span>
+                        </button>
+                      )}
+                    </div>
+                  </ScrollArea>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="px-8 py-5 border-t-2 border-orange-200 bg-white flex justify-between items-center gap-4">
+              {error && (
+                <div className="flex-1 p-3 bg-red-50 border-2 border-red-200 rounded-xl text-red-600 text-sm font-medium">
+                  {error}
+                </div>
+              )}
+              <div className="flex gap-3 ml-auto">
+                <Button
+                  variant="outline"
+                  onClick={handleCloseRecipeForm}
+                  disabled={isSaving}
+                  className="px-8 py-2.5 rounded-xl border-2 border-gray-200 hover:bg-gray-50 font-semibold h-auto"
+                >
+                  Hủy
+                </Button>
+                <Button
+                  onClick={handleSaveRecipe}
+                  disabled={isSaving}
+                  className="px-8 py-2.5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white font-semibold shadow-lg shadow-orange-200 hover:shadow-xl hover:scale-105 transition-all h-auto"
+                >
+                  {isSaving ? (
+                    <>
+                      <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                      Đang lưu...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-5 w-5 mr-2" />
+                      Lưu công thức
+                    </>
+                  )}
+                </Button>
+              </div>
             </div>
           </DialogContent>
         </Dialog>

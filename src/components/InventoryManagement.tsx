@@ -13,13 +13,6 @@ import {
   DialogTrigger,
 } from "./ui/dialog";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "./ui/select";
-import {
   Package,
   Plus,
   Edit,
@@ -27,7 +20,6 @@ import {
   Search,
   Loader2,
   AlertTriangle,
-  Upload,
   Camera,
 } from "lucide-react";
 import { ScrollArea } from "./ui/scroll-area";
@@ -37,16 +29,7 @@ import type {
   CreateIngredientDto,
   MeasureUnit,
 } from "../types/api";
-
-const measureUnits: { value: MeasureUnit; label: string }[] = [
-  { value: "g", label: "gram (g)" },
-  { value: "kg", label: "kilogram (kg)" },
-  { value: "l", label: "liter (l)" },
-  { value: "ml", label: "milliliter (ml)" },
-  { value: "pcs", label: "cái/miếng (pcs)" },
-  { value: "tsp", label: "thìa cà phê (tsp)" },
-  { value: "tbsp", label: "thìa canh (tbsp)" },
-];
+import { toast } from "sonner";
 
 export function InventoryManagement() {
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
@@ -62,6 +45,7 @@ export function InventoryManagement() {
   const [formData, setFormData] = useState<CreateIngredientDto>({
     name: "",
     amountLeft: 0,
+    minAmount: 0,
     measureUnit: "g",
   });
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -92,6 +76,16 @@ export function InventoryManagement() {
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      // Validate file type
+      if (!file.type.startsWith("image/")) {
+        toast.error("Vui lòng chọn file ảnh!");
+        return;
+      }
+      // Validate file size (max 10MB)
+      if (file.size > 10 * 1024 * 1024) {
+        toast.error("Kích thước ảnh không được vượt quá 10MB!");
+        return;
+      }
       setImageFile(file);
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -107,6 +101,7 @@ export function InventoryManagement() {
       setFormData({
         name: ingredient.name,
         amountLeft: ingredient.amountLeft,
+        minAmount: ingredient.minAmount || 0,
         measureUnit: ingredient.measureUnit,
       });
       setImagePreview(ingredient.image || "");
@@ -116,6 +111,7 @@ export function InventoryManagement() {
       setFormData({
         name: "",
         amountLeft: 0,
+        minAmount: 0,
         measureUnit: "g",
       });
       setImagePreview("");
@@ -127,19 +123,27 @@ export function InventoryManagement() {
   const handleCloseDialog = () => {
     setIsDialogOpen(false);
     setEditingIngredient(null);
-    setFormData({ name: "", amountLeft: 0, measureUnit: "g" });
+    setFormData({
+      name: "",
+      amountLeft: 0,
+      minAmount: 0,
+      measureUnit: "g",
+    });
     setImagePreview("");
     setImageFile(null);
   };
 
   const handleSave = async () => {
     if (!formData.name.trim()) {
-      alert("Vui lòng nhập tên nguyên liệu!");
+      toast.error("Vui lòng nhập tên nguyên liệu!");
       return;
     }
 
-    if (formData.amountLeft < 0) {
-      alert("Số lượng phải >= 0!");
+    if (
+      formData.amountLeft < 0 ||
+      (formData.minAmount && formData.minAmount < 0)
+    ) {
+      toast.error("Số lượng phải >= 0!");
       return;
     }
 
@@ -156,13 +160,17 @@ export function InventoryManagement() {
             "amountLeft",
             formData.amountLeft.toString()
           );
+          formDataWithImage.append(
+            "minAmount",
+            (formData.minAmount || 0).toString()
+          );
           formDataWithImage.append("measureUnit", formData.measureUnit);
           formDataWithImage.append("image", imageFile);
           await ingredientsApi.update(editingIngredient.id, formDataWithImage);
         } else {
           await ingredientsApi.update(editingIngredient.id, formData);
         }
-        alert("Cập nhật nguyên liệu thành công!");
+        toast.success("Cập nhật nguyên liệu thành công!");
       } else {
         // Create ingredient
         if (imageFile) {
@@ -172,13 +180,17 @@ export function InventoryManagement() {
             "amountLeft",
             formData.amountLeft.toString()
           );
+          formDataWithImage.append(
+            "minAmount",
+            (formData.minAmount || 0).toString()
+          );
           formDataWithImage.append("measureUnit", formData.measureUnit);
           formDataWithImage.append("image", imageFile);
           await ingredientsApi.create(formDataWithImage);
         } else {
           await ingredientsApi.create(formData);
         }
-        alert("Thêm nguyên liệu thành công!");
+        toast.success("Thêm nguyên liệu thành công!");
       }
 
       await loadIngredients();
@@ -188,7 +200,7 @@ export function InventoryManagement() {
         err.response?.data?.message ||
         "Không thể lưu nguyên liệu. Vui lòng thử lại!";
       setError(message);
-      alert(message);
+      toast.error(message);
       console.error("Save ingredient error:", err);
     } finally {
       setIsSaving(false);
@@ -203,26 +215,26 @@ export function InventoryManagement() {
     setError("");
     try {
       await ingredientsApi.remove(id);
-      alert("Xóa nguyên liệu thành công!");
+      toast.success("Xóa nguyên liệu thành công!");
       await loadIngredients();
     } catch (err: any) {
       const message =
         err.response?.data?.message ||
         "Không thể xóa nguyên liệu. Vui lòng thử lại!";
       setError(message);
-      alert(message);
+      toast.error(message);
       console.error("Delete ingredient error:", err);
     }
   };
 
-  const getStockStatus = (amountLeft: number) => {
+  const getStockStatus = (amountLeft: number, minAmount: number) => {
     if (amountLeft === 0) {
       return (
         <Badge className="bg-red-100 text-red-700 border-red-300">
           Hết hàng
         </Badge>
       );
-    } else if (amountLeft < 100) {
+    } else if (amountLeft > 0 && amountLeft <= minAmount) {
       return (
         <Badge className="bg-yellow-100 text-yellow-700 border-yellow-300">
           Sắp hết
@@ -242,7 +254,9 @@ export function InventoryManagement() {
   });
 
   const totalIngredients = ingredients.length;
-  const lowStockCount = ingredients.filter((i) => i.amountLeft < 100).length;
+  const lowStockCount = ingredients.filter(
+    (i) => i.amountLeft > 0 && i.amountLeft <= i.minAmount
+  ).length;
   const outOfStockCount = ingredients.filter((i) => i.amountLeft === 0).length;
 
   return (
@@ -265,7 +279,7 @@ export function InventoryManagement() {
               Thêm nguyên liệu
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[500px]">
+          <DialogContent className="sm:max-w-[500px] max-h-[80vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>
                 {editingIngredient
@@ -281,14 +295,14 @@ export function InventoryManagement() {
 
             <div className="space-y-4 py-4">
               {/* Image Upload */}
-              <div className="flex gap-4 items-start">
+              <div className="flex gap-3 items-start">
                 <div className="flex-shrink-0">
-                  <div className="w-32 h-32 border-2 border-dashed border-orange-300 rounded-xl overflow-hidden bg-orange-50 flex items-center justify-center">
+                  <div className="w-20 h-20 border-2 border-dashed border-orange-300 rounded-lg overflow-hidden bg-orange-50 flex items-center justify-center">
                     {imagePreview ? (
                       <img
                         src={imagePreview}
                         alt="Preview"
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-contain p-1"
                       />
                     ) : (
                       <div className="flex flex-col items-center justify-center text-gray-400">
@@ -316,7 +330,7 @@ export function InventoryManagement() {
                     Chọn ảnh
                   </Button>
                   <p className="text-xs text-gray-400 text-center mt-1">
-                    JPG, PNG (max 10MB)
+                    JPG, PNG, GIF (max 10MB)
                   </p>
                 </div>
                 <div className="flex-1 space-y-4">
@@ -338,6 +352,7 @@ export function InventoryManagement() {
                       id="amountLeft"
                       type="number"
                       min="0"
+                      step="0.01"
                       value={formData.amountLeft}
                       onChange={(e) =>
                         setFormData({
@@ -350,24 +365,44 @@ export function InventoryManagement() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Đơn vị đo *</Label>
-                    <Select
-                      value={formData.measureUnit}
-                      onValueChange={(value: MeasureUnit) =>
-                        setFormData({ ...formData, measureUnit: value })
+                    <Label htmlFor="minAmount">Số lượng tối thiểu *</Label>
+                    <Input
+                      id="minAmount"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={formData.minAmount || 0}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          minAmount: Number(e.target.value),
+                        })
                       }
+                      placeholder="0"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="measureUnit">Đơn vị đo *</Label>
+                    <select
+                      id="measureUnit"
+                      value={formData.measureUnit}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          measureUnit: e.target.value as MeasureUnit,
+                        })
+                      }
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {measureUnits.map((unit) => (
-                          <SelectItem key={unit.value} value={unit.value}>
-                            {unit.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      <option value="g">g (gram)</option>
+                      <option value="kg">kg (kilogram)</option>
+                      <option value="l">l (liter)</option>
+                      <option value="ml">ml (milliliter)</option>
+                      <option value="pcs">pcs (pieces)</option>
+                      <option value="tsp">tsp (teaspoon)</option>
+                      <option value="tbsp">tbsp (tablespoon)</option>
+                    </select>
                   </div>
                 </div>
               </div>
@@ -476,44 +511,64 @@ export function InventoryManagement() {
             <p className="text-amber-600/50">Không tìm thấy nguyên liệu</p>
           </div>
         ) : (
-          <div className="grid gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
             {filteredIngredients.map((ingredient) => (
               <Card
                 key={ingredient.id}
-                className="p-4 hover:shadow-lg transition-all border-2 border-orange-100 hover:border-orange-300 rounded-2xl"
+                className="overflow-hidden hover:shadow-xl transition-all border-2 border-orange-100 hover:border-orange-300 rounded-2xl flex flex-col"
+                style={{ height: "380px" }}
               >
-                <div className="flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-4 flex-1">
-                    <img
-                      src={ingredient.image || "/default/default-avatar.jpg"}
-                      alt={ingredient.name}
-                      className="h-12 w-12 rounded-full object-cover border-2 border-orange-200"
-                      onError={(e) => {
-                        e.currentTarget.src = "/default/default-avatar.jpg";
-                      }}
-                    />
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h4 className="font-bold text-amber-900">
-                          {ingredient.name}
-                        </h4>
-                        {getStockStatus(ingredient.amountLeft)}
-                      </div>
-                      <p className="text-sm text-amber-600">
-                        Còn lại:{" "}
-                        <span className="font-semibold">
-                          {ingredient.amountLeft}
-                        </span>{" "}
-                        {ingredient.measureUnit}
-                      </p>
-                    </div>
+                <div
+                  className="relative bg-gradient-to-br from-orange-50 to-amber-50 flex-shrink-0"
+                  style={{ height: "200px" }}
+                >
+                  <img
+                    src={ingredient.image || "/default/default-avatar.jpg"}
+                    alt={ingredient.name}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      e.currentTarget.src = "/default/default-avatar.jpg";
+                    }}
+                  />
+                  {/* Status Badge */}
+                  <div className="absolute top-2 right-2">
+                    {getStockStatus(
+                      ingredient.amountLeft,
+                      ingredient.minAmount
+                    )}
+                  </div>
+                </div>
+                <div className="p-4 flex flex-col" style={{ height: "180px" }}>
+                  <div className="flex-grow">
+                    <h4
+                      className="font-medium text-amber-900 mb-1 truncate"
+                      style={{ height: "24px", lineHeight: "24px" }}
+                    >
+                      {ingredient.name}
+                    </h4>
+                    <p
+                      className="text-sm text-orange-600 mb-2"
+                      style={{ height: "20px", lineHeight: "20px" }}
+                    >
+                      Còn lại:{" "}
+                      <span className="font-semibold">
+                        {ingredient.amountLeft}
+                      </span>{" "}
+                      {ingredient.measureUnit}
+                    </p>
+                    <p
+                      className="text-xs text-amber-600 mb-3"
+                      style={{ height: "16px", lineHeight: "16px" }}
+                    >
+                      Tối thiểu: {ingredient.minAmount} {ingredient.measureUnit}
+                    </p>
                   </div>
 
                   <div className="flex gap-2">
                     <Button
                       variant="outline"
                       size="sm"
-                      className="border-orange-200 hover:bg-orange-50"
+                      className="flex-1 border-orange-200 hover:bg-orange-50"
                       onClick={() => handleOpenDialog(ingredient)}
                     >
                       <Edit className="h-4 w-4 mr-1" />

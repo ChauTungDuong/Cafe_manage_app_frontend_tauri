@@ -58,6 +58,7 @@ export function RevenueDashboard() {
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState("");
   const [showGenerateDialog, setShowGenerateDialog] = useState(false);
+  const [showReportsList, setShowReportsList] = useState(false);
 
   // Date range for filtering display
   const [filterStartDate, setFilterStartDate] = useState("");
@@ -370,6 +371,132 @@ export function RevenueDashboard() {
             <RefreshCw className="h-4 w-4 mr-2" />
             Làm mới
           </Button>
+          <Dialog open={showReportsList} onOpenChange={setShowReportsList}>
+            <DialogTrigger asChild>
+              <Button className="h-11 px-6 rounded-xl bg-gradient-to-r from-purple-500 to-violet-600 text-white">
+                <FileText className="h-4 w-4 mr-2" />
+                Xem báo cáo
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle className="text-amber-900">
+                  Danh sách báo cáo đã tạo
+                </DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                {statistics.length === 0 ? (
+                  <div className="text-center py-12">
+                    <FileText className="h-12 w-12 text-amber-600/30 mx-auto mb-3" />
+                    <p className="text-amber-600">Chưa có báo cáo nào</p>
+                    <p className="text-amber-700/70 text-sm mt-2">
+                      Sử dụng các nút "Tạo 30 ngày" hoặc "Tạo báo cáo" để tạo
+                      báo cáo mới
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="mb-4 p-4 bg-orange-50 rounded-xl border border-orange-200">
+                      <p className="text-amber-900 font-medium">
+                        Tổng số báo cáo: {statistics.length}{" "}
+                        {period === "daily" ? "ngày" : "tháng"}
+                      </p>
+                      {filterStartDate && filterEndDate && (
+                        <p className="text-amber-700 text-sm mt-1">
+                          Từ {filterStartDate} đến {filterEndDate}
+                        </p>
+                      )}
+                    </div>
+                    <div className="grid gap-4">
+                      {statistics.map((stat) => (
+                        <Card
+                          key={stat.id}
+                          className="p-4 border-2 border-orange-100 hover:shadow-lg transition-all"
+                        >
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-2">
+                                <Calendar className="h-4 w-4 text-orange-600" />
+                                <span className="font-semibold text-amber-900">
+                                  {new Date(stat.date).toLocaleDateString(
+                                    "vi-VN"
+                                  )}
+                                </span>
+                                <span className="px-2 py-1 bg-orange-100 text-orange-700 text-xs rounded-full">
+                                  {stat.period === "daily" ? "Ngày" : "Tháng"}
+                                </span>
+                              </div>
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-3">
+                                <div>
+                                  <p className="text-xs text-amber-700/70">
+                                    Doanh thu
+                                  </p>
+                                  <p className="font-semibold text-orange-600">
+                                    {stat.totalRevenue.toLocaleString("vi-VN")}đ
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-xs text-amber-700/70">
+                                    Đơn hàng
+                                  </p>
+                                  <p className="font-semibold text-orange-600">
+                                    {stat.totalOrders}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-xs text-amber-700/70">
+                                    TB/đơn
+                                  </p>
+                                  <p className="font-semibold text-orange-600">
+                                    {stat.averageOrderValue.toLocaleString(
+                                      "vi-VN",
+                                      {
+                                        maximumFractionDigits: 0,
+                                      }
+                                    )}
+                                    đ
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-xs text-amber-700/70">
+                                    SP đã bán
+                                  </p>
+                                  <p className="font-semibold text-orange-600">
+                                    {stat.totalProductsSold}
+                                  </p>
+                                </div>
+                              </div>
+                              {stat.topProducts &&
+                                stat.topProducts.length > 0 && (
+                                  <div className="mt-3 pt-3 border-t border-orange-100">
+                                    <p className="text-xs text-amber-700/70 mb-2">
+                                      Top sản phẩm:
+                                    </p>
+                                    <div className="flex flex-wrap gap-2">
+                                      {stat.topProducts
+                                        .slice(0, 3)
+                                        .map((product, idx) => (
+                                          <span
+                                            key={idx}
+                                            className="px-2 py-1 bg-amber-50 text-amber-800 text-xs rounded-lg"
+                                          >
+                                            {product.itemName} (
+                                            {product.totalQuantity})
+                                          </span>
+                                        ))}
+                                    </div>
+                                  </div>
+                                )}
+                            </div>
+                          </div>
+                        </Card>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 

@@ -17,6 +17,104 @@ export function Login({ onLogin }: LoginProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState("");
 
+  // Forgot password state
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [forgotPasswordStep, setForgotPasswordStep] = useState<
+    "email" | "reset"
+  >("email");
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [otp, setOtp] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [forgotPasswordError, setForgotPasswordError] = useState("");
+  const [forgotPasswordSuccess, setForgotPasswordSuccess] = useState("");
+
+  const handleSendOtp = async () => {
+    console.log("📧 Sending OTP to email:", forgotEmail);
+    setForgotPasswordError("");
+    setForgotPasswordSuccess("");
+    setIsLoading(true);
+
+    try {
+      console.log("🔗 Calling authApi.forgotPassword...");
+      const result = await authApi.forgotPassword(forgotEmail);
+      console.log("✅ OTP sent successfully:", result);
+      setForgotPasswordSuccess(
+        "Mã OTP đã được gửi đến email của bạn (hiệu lực 5 phút)"
+      );
+      setForgotPasswordStep("reset");
+    } catch (err: any) {
+      console.error("❌ Send OTP error:", err);
+      console.error("Error details:", {
+        message: err.message,
+        response: err.response?.data,
+        status: err.response?.status,
+      });
+      setForgotPasswordError(
+        err.response?.data?.message || "Không thể gửi OTP. Vui lòng thử lại!"
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResetPassword = async () => {
+    console.log("🔑 Resetting password for:", forgotEmail);
+    setForgotPasswordError("");
+    setForgotPasswordSuccess("");
+
+    if (!otp || !newPassword || !confirmPassword) {
+      setForgotPasswordError("Vui lòng điền đầy đủ thông tin!");
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setForgotPasswordError("Mật khẩu xác nhận không khớp!");
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      setForgotPasswordError("Mật khẩu phải có ít nhất 6 ký tự!");
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      console.log("🔗 Calling authApi.resetPassword...");
+      const result = await authApi.resetPassword(forgotEmail, otp, newPassword);
+      console.log("✅ Password reset successfully:", result);
+      setForgotPasswordSuccess(
+        "Đặt lại mật khẩu thành công! Vui lòng đăng nhập lại."
+      );
+
+      // Reset form and close dialog after 2 seconds
+      setTimeout(() => {
+        setShowForgotPassword(false);
+        setForgotPasswordStep("email");
+        setForgotEmail("");
+        setOtp("");
+        setNewPassword("");
+        setConfirmPassword("");
+        setForgotPasswordError("");
+        setForgotPasswordSuccess("");
+      }, 2000);
+    } catch (err: any) {
+      console.error("❌ Reset password error:", err);
+      console.error("Error details:", {
+        message: err.message,
+        response: err.response?.data,
+        status: err.response?.status,
+      });
+      setForgotPasswordError(
+        err.response?.data?.message ||
+          "Không thể đặt lại mật khẩu. Vui lòng thử lại!"
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent, retryCount = 0) => {
     e.preventDefault();
     setError("");
@@ -139,6 +237,16 @@ export function Login({ onLogin }: LoginProps) {
               </div>
             )}
 
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowForgotPassword(true)}
+                className="text-sm text-amber-600 hover:text-amber-700 hover:underline"
+              >
+                Quên mật khẩu?
+              </button>
+            </div>
+
             <Button
               type="submit"
               disabled={isLoading}
@@ -166,6 +274,177 @@ export function Login({ onLogin }: LoginProps) {
           © 2024 Cafe Manager System
         </p>
       </div>
+
+      {/* Forgot Password Modal */}
+      {showForgotPassword && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-md">
+            <h2 className="text-2xl font-bold text-amber-900 mb-6">
+              {forgotPasswordStep === "email"
+                ? "Quên mật khẩu"
+                : "Đặt lại mật khẩu"}
+            </h2>
+
+            {forgotPasswordStep === "email" ? (
+              // Step 1: Email input
+              <div className="space-y-5">
+                <div className="space-y-2">
+                  <Label htmlFor="forgot-email" className="text-amber-900">
+                    Email
+                  </Label>
+                  <Input
+                    id="forgot-email"
+                    type="email"
+                    placeholder="Nhập email của bạn"
+                    value={forgotEmail}
+                    onChange={(e) => setForgotEmail(e.target.value)}
+                    className="h-12 border-amber-200 focus:border-amber-500 focus:ring-amber-500 rounded-xl"
+                  />
+                </div>
+
+                {forgotPasswordError && (
+                  <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
+                    {forgotPasswordError}
+                  </div>
+                )}
+
+                {forgotPasswordSuccess && (
+                  <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl text-sm">
+                    {forgotPasswordSuccess}
+                  </div>
+                )}
+
+                <div className="flex gap-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setShowForgotPassword(false);
+                      setForgotEmail("");
+                      setForgotPasswordError("");
+                      setForgotPasswordSuccess("");
+                      setForgotPasswordStep("email");
+                    }}
+                    className="flex-1 h-12 border-amber-200 hover:bg-amber-50 rounded-xl"
+                  >
+                    Hủy
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={handleSendOtp}
+                    disabled={isLoading || !forgotEmail}
+                    className="flex-1 h-12 bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white rounded-xl"
+                  >
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                        Đang gửi...
+                      </>
+                    ) : (
+                      "Xác nhận gửi OTP"
+                    )}
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              // Step 2: Reset password
+              <div className="space-y-5">
+                <div className="bg-amber-50 border border-amber-200 px-4 py-3 rounded-xl text-sm text-amber-800">
+                  Email: <strong>{forgotEmail}</strong>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="otp" className="text-amber-900">
+                    Mã OTP
+                  </Label>
+                  <Input
+                    id="otp"
+                    type="text"
+                    placeholder="Nhập mã OTP (6 số)"
+                    value={otp}
+                    onChange={(e) => setOtp(e.target.value)}
+                    maxLength={6}
+                    className="h-12 border-amber-200 focus:border-amber-500 focus:ring-amber-500 rounded-xl"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="new-password" className="text-amber-900">
+                    Mật khẩu mới
+                  </Label>
+                  <Input
+                    id="new-password"
+                    type="password"
+                    placeholder="Nhập mật khẩu mới (tối thiểu 6 ký tự)"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="h-12 border-amber-200 focus:border-amber-500 focus:ring-amber-500 rounded-xl"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="confirm-password" className="text-amber-900">
+                    Xác nhận mật khẩu
+                  </Label>
+                  <Input
+                    id="confirm-password"
+                    type="password"
+                    placeholder="Nhập lại mật khẩu mới"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="h-12 border-amber-200 focus:border-amber-500 focus:ring-amber-500 rounded-xl"
+                  />
+                </div>
+
+                {forgotPasswordError && (
+                  <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
+                    {forgotPasswordError}
+                  </div>
+                )}
+
+                {forgotPasswordSuccess && (
+                  <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl text-sm">
+                    {forgotPasswordSuccess}
+                  </div>
+                )}
+
+                <div className="flex gap-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setForgotPasswordStep("email");
+                      setOtp("");
+                      setNewPassword("");
+                      setConfirmPassword("");
+                      setForgotPasswordError("");
+                      setForgotPasswordSuccess("");
+                    }}
+                    className="flex-1 h-12 border-amber-200 hover:bg-amber-50 rounded-xl"
+                  >
+                    Quay lại
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={handleResetPassword}
+                    disabled={isLoading}
+                    className="flex-1 h-12 bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white rounded-xl"
+                  >
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                        Đang xử lý...
+                      </>
+                    ) : (
+                      "Đặt lại mật khẩu"
+                    )}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

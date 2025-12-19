@@ -22,6 +22,7 @@ export interface Category {
   name: string;
   description?: string;
   createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Item {
@@ -29,9 +30,9 @@ export interface Item {
   name: string;
   category: Category;
   price: number;
-  amountLeft: number;
   description?: string;
   image?: string;
+  imagePublicId?: string;
   status: "available" | "out of stock" | "discontinued";
   createdAt?: string;
   updatedAt?: string;
@@ -49,9 +50,13 @@ export interface Tax {
   id: string;
   name: string;
   description?: string;
-  percent: string;
+  percent: number;
   type: "tax" | "discount";
+  isActive?: boolean;
+  applyFrom?: string;
+  applyTo?: string;
   createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface OrderItem {
@@ -65,11 +70,7 @@ export interface Order {
   orderCode: string;
   totalAmount: number;
   status: "pending" | "paid" | "cancelled";
-  createdBy: {
-    id: string;
-    name: string;
-    email: string;
-  };
+  createdBy: User;
   taxesAndDiscounts: Tax[];
   table: Table;
   orderItems: OrderItem[];
@@ -80,12 +81,13 @@ export interface Order {
 
 export interface Payment {
   id: string;
-  orderId: string;
   method: "cash" | "QR" | "card";
   amount: number;
   qrCode?: string;
-  orderCode: string;
+  qrCodePublicId?: string;
+  orderCode?: string;
   createdAt: string;
+  updatedAt?: string;
 }
 
 // Ingredient & Recipe types
@@ -94,8 +96,9 @@ export type MeasureUnit = "g" | "kg" | "l" | "ml" | "pcs" | "tsp" | "tbsp";
 export interface Ingredient {
   id: string;
   name: string;
-  amountLeft: number;
   measureUnit: MeasureUnit;
+  amountLeft: number;
+  minAmount: number;
   image?: string;
   imagePublicId?: string;
   createdAt?: string;
@@ -104,12 +107,14 @@ export interface Ingredient {
 
 export interface RecipeIngredient {
   id: string;
-  ingredient: Ingredient;
   amount: number;
+  ingredient: Ingredient;
 }
 
 export interface Recipe {
   id: string;
+  name: string;
+  description?: string;
   item: Item;
   recipeIngredients: RecipeIngredient[];
   createdAt?: string;
@@ -135,7 +140,6 @@ export interface CreateItemDto {
     name: string;
   };
   price: number;
-  amountLeft: number;
   description?: string;
   status: "available" | "out of stock" | "discontinued";
 }
@@ -154,10 +158,17 @@ export interface CreateIngredientDto {
   name: string;
   amountLeft: number;
   measureUnit: MeasureUnit;
+  minAmount?: number;
+  image?: string;
+  imagePublicId?: string;
 }
 
 export interface BulkCreateIngredientsDto {
-  ingredients: CreateIngredientDto[];
+  ingredients: Array<{
+    name: string;
+    amountLeft: number;
+    measureUnit: MeasureUnit;
+  }>;
 }
 
 export interface CreateRecipeIngredientDto {
@@ -166,20 +177,23 @@ export interface CreateRecipeIngredientDto {
 }
 
 export interface CreateRecipeDto {
+  name: string;
+  description?: string;
   itemId: string;
   ingredients: CreateRecipeIngredientDto[];
 }
 
-export interface CreateTaxDto {
-  name: string;
+export interface UpdateRecipeDto {
+  name?: string;
   description?: string;
-  percent: number;
+  ingredients?: CreateRecipeIngredientDto[];
 }
 
 export interface CreateTaxDto {
   name: string;
   description?: string;
   percent: number;
+  type: "tax" | "discount";
 }
 
 export interface CreateOrderDto {
@@ -195,6 +209,15 @@ export interface CreateOrderDto {
 export interface CreatePaymentDto {
   orderId: string;
   method: "cash" | "QR" | "card";
+}
+
+export interface UpdateIngredientDto {
+  name?: string;
+  amountLeft?: number;
+  measureUnit?: MeasureUnit;
+  minAmount?: number;
+  image?: string;
+  imagePublicId?: string;
 }
 
 // ============ STATISTICS TYPES ============

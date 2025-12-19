@@ -304,20 +304,53 @@ export const authApi = {
     return response.data;
   },
 
-  // Đăng xuất (tạm ẩn API call vì backend chưa có endpoint)
+  // Đăng xuất
   async logout(): Promise<void> {
     try {
-      // TODO: Bật lại khi backend có API logout
-      // await api.post("/auth/logout");
-      console.log(
-        "Logout - clearing local tokens (API endpoint not available yet)"
-      );
+      await api.post("/auth/logout");
+      console.log("✅ Logout successful - token invalidated on server");
     } catch (error) {
-      console.error("Logout error:", error);
+      console.error("❌ Logout API error:", error);
     } finally {
       await clearRefreshToken();
       setAccessToken(null);
     }
+  },
+
+  // Quên mật khẩu - Gửi OTP
+  async forgotPassword(
+    email: string
+  ): Promise<{ success: boolean; message: string; expiresIn: string }> {
+    const response = await axios.post(`${BACKEND_URL}/auth/forgot-password`, {
+      email,
+    });
+    return response.data;
+  },
+
+  // Xác thực OTP (Optional)
+  async verifyOtp(
+    email: string,
+    otp: string
+  ): Promise<{ success: boolean; message: string }> {
+    const response = await axios.post(`${BACKEND_URL}/auth/verify-otp`, {
+      email,
+      otp,
+    });
+    return response.data;
+  },
+
+  // Đặt lại mật khẩu
+  async resetPassword(
+    email: string,
+    otp: string,
+    newPassword: string
+  ): Promise<{ success: boolean; message: string }> {
+    const response = await axios.post(`${BACKEND_URL}/auth/reset-password`, {
+      email,
+      otp,
+      newPassword,
+    });
+    return response.data;
   },
 
   // Lấy thông tin user hiện tại (GET /auth/profile)
@@ -463,7 +496,6 @@ export const itemsApi = {
     formData.append("name", dto.name);
     formData.append("category", JSON.stringify(dto.category));
     formData.append("price", dto.price.toString());
-    formData.append("amountLeft", dto.amountLeft.toString());
     formData.append("status", dto.status);
 
     if (dto.description) {
@@ -500,8 +532,6 @@ export const itemsApi = {
 
     if (dto.name) formData.append("name", dto.name);
     if (dto.price !== undefined) formData.append("price", dto.price.toString());
-    if (dto.amountLeft !== undefined)
-      formData.append("amountLeft", dto.amountLeft.toString());
     if (dto.status) formData.append("status", dto.status);
     if (dto.description !== undefined)
       formData.append("description", dto.description);
@@ -734,7 +764,7 @@ export const ingredientsApi = {
 };
 
 // ============ RECIPES API ============
-import type { Recipe, CreateRecipeDto } from "../types/api";
+import type { Recipe, CreateRecipeDto, UpdateRecipeDto } from "../types/api";
 
 export const recipesApi = {
   // Get all recipes
@@ -762,17 +792,15 @@ export const recipesApi = {
   },
 
   // Update recipe
-  update: async (
-    id: string,
-    dto: Partial<CreateRecipeDto>
-  ): Promise<Recipe> => {
+  update: async (id: string, dto: UpdateRecipeDto): Promise<Recipe> => {
     const response = await api.patch(`/recipes/${id}`, dto);
     return response.data;
   },
 
   // Delete recipe
-  remove: async (id: string): Promise<void> => {
-    await api.delete(`/recipes/${id}`);
+  delete: async (id: string): Promise<{ message: string }> => {
+    const response = await api.delete(`/recipes/${id}`);
+    return response.data;
   },
 };
 
@@ -813,7 +841,7 @@ export const statisticsApi = {
 
   // Generate statistics for last 30 days
   generateLastMonth: async (): Promise<GenerateStatsResponse> => {
-    const response = await api.post("/statistics/generate-last-month");
+    const response = await api.post("/statistics/generate");
     return response.data;
   },
 

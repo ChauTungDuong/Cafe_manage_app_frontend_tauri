@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Toaster } from "sonner";
 
 // Assets moved to `public/default` — reference via absolute public paths
 const defaultAvatar = "/default/default-avatar.jpg";
@@ -363,6 +364,7 @@ export default function App() {
           )}
         </div>
       </main>
+      <Toaster position="top-center" richColors />
     </div>
   );
 }

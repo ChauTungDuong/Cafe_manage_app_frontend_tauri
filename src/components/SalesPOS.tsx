@@ -43,6 +43,7 @@ import {
 } from "../lib/api";
 import { usePaymentWebSocket } from "../lib/usePaymentWebSocket";
 import type { Item, Table, Tax } from "../types/api";
+import { toast } from "sonner";
 
 interface OrderItem extends Item {
   quantity: number;
@@ -235,7 +236,7 @@ export function SalesPOS({ currentUser }: SalesPOSProps) {
     // Check stock
     const currentQuantity = order.find((o) => o.id === item.id)?.quantity || 0;
     if (currentQuantity >= item.amountLeft) {
-      alert(`Không đủ hàng! Còn lại: ${item.amountLeft}`);
+      toast.error(`Không đủ hàng! Còn lại: ${item.amountLeft}`);
       return;
     }
 
@@ -260,7 +261,7 @@ export function SalesPOS({ currentUser }: SalesPOSProps) {
           const newQuantity = Math.max(1, item.quantity + delta);
           // Check stock limit
           if (newQuantity > item.amountLeft) {
-            alert(`Không đủ hàng! Còn lại: ${item.amountLeft}`);
+            toast.error(`Không đủ hàng! Còn lại: ${item.amountLeft}`);
             return item;
           }
           return { ...item, quantity: newQuantity };
@@ -308,17 +309,17 @@ export function SalesPOS({ currentUser }: SalesPOSProps) {
     }
 
     if (!currentUser) {
-      alert("Vui lòng đăng nhập để thực hiện thanh toán!");
+      toast.error("Vui lòng đăng nhập để thực hiện thanh toán!");
       return;
     }
 
     if (order.length === 0) {
-      alert("Vui lòng thêm sản phẩm vào đơn hàng!");
+      toast.error("Vui lòng thêm sản phẩm vào đơn hàng!");
       return;
     }
 
     if (!selectedTable) {
-      alert("Vui lòng chọn bàn!");
+      toast.error("Vui lòng chọn bàn!");
       return;
     }
 
@@ -351,7 +352,7 @@ export function SalesPOS({ currentUser }: SalesPOSProps) {
         err.response?.data?.message ||
         "Không thể tạo đơn hàng. Vui lòng thử lại!";
       setError(message);
-      alert(message);
+      toast.error(message);
       console.error("❌ Create order error:", err);
     } finally {
       setIsProcessing(false);
@@ -409,7 +410,7 @@ export function SalesPOS({ currentUser }: SalesPOSProps) {
         err.response?.data?.message ||
         "Không thể thanh toán. Vui lòng thử lại!";
       setError(message);
-      alert(message);
+      toast.error(message);
       console.error("Payment error:", err);
     } finally {
       setIsProcessing(false);
@@ -512,10 +513,14 @@ export function SalesPOS({ currentUser }: SalesPOSProps) {
               {filteredItems.map((item) => (
                 <Card
                   key={item.id}
-                  className="overflow-hidden cursor-pointer hover:shadow-xl transition-all border-2 border-orange-100 hover:border-orange-300 rounded-2xl group"
+                  className="overflow-hidden cursor-pointer hover:shadow-xl transition-all border-2 border-orange-100 hover:border-orange-300 rounded-2xl group flex flex-col"
                   onClick={() => addToOrder(item)}
+                  style={{ height: "360px" }}
                 >
-                  <div className="aspect-square relative bg-gradient-to-br from-orange-50 to-amber-50">
+                  <div
+                    className="relative bg-gradient-to-br from-orange-50 to-amber-50 flex-shrink-0"
+                    style={{ height: "200px" }}
+                  >
                     <ImageWithFallback
                       src={
                         item.image ||
@@ -528,13 +533,21 @@ export function SalesPOS({ currentUser }: SalesPOSProps) {
                       <Plus className="h-8 w-8 text-white" />
                     </div>
                   </div>
-                  <div className="p-4">
-                    <h4 className="mb-1 text-amber-900">{item.name}</h4>
-                    <p className="text-orange-600 font-semibold">
+                  <div
+                    className="p-4 flex flex-col"
+                    style={{ height: "160px" }}
+                  >
+                    <h4
+                      className="mb-1 text-amber-900 truncate font-medium"
+                      style={{ height: "24px", lineHeight: "24px" }}
+                    >
+                      {item.name}
+                    </h4>
+                    <p
+                      className="text-orange-600 font-semibold text-lg mt-3"
+                      style={{ height: "28px", lineHeight: "98px" }}
+                    >
                       {item.price.toLocaleString("vi-VN")}đ
-                    </p>
-                    <p className="text-xs text-amber-600 mt-1">
-                      Còn: {item.amountLeft}
                     </p>
                   </div>
                 </Card>
