@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card } from "./ui/card";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -19,7 +19,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "./ui/select";
-import { UserPlus, Edit, Trash2, Search, Loader2, UserX } from "lucide-react";
+import {
+  UserPlus,
+  Edit,
+  Trash2,
+  Search,
+  Loader2,
+  UserX,
+  ImagePlus,
+} from "lucide-react";
 import { ScrollArea } from "./ui/scroll-area";
 import { usersApi } from "../lib/api";
 import type { User, CreateUserDto } from "../types/api";
@@ -45,7 +53,15 @@ export function UserManagement() {
     password: "",
     confirmPassword: "",
     role: "staff" as "admin" | "staff",
+    gender: "male" as "male" | "female",
+    birthday: "",
+    phone: "",
+    address: "",
+    isActive: true,
   });
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string>("");
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Load users on mount
   useEffect(() => {
@@ -78,7 +94,16 @@ export function UserManagement() {
         password: "",
         confirmPassword: "",
         role: user.role,
+        gender: (user.gender || "male") as "male" | "female",
+        birthday: user.birthday
+          ? new Date(user.birthday).toISOString().split("T")[0]
+          : "",
+        phone: user.phone || "",
+        address: user.address || "",
+        isActive: user.isActive !== false,
       });
+      setAvatarPreview(user.avatar || "");
+      setAvatarFile(null);
     } else {
       // Add mode
       setEditingUser(null);
@@ -88,7 +113,14 @@ export function UserManagement() {
         password: "",
         confirmPassword: "",
         role: "staff",
+        gender: "male",
+        birthday: "",
+        phone: "",
+        address: "",
+        isActive: true,
       });
+      setAvatarPreview("");
+      setAvatarFile(null);
     }
     setIsDialogOpen(true);
   };
@@ -102,7 +134,14 @@ export function UserManagement() {
       password: "",
       confirmPassword: "",
       role: "staff",
+      gender: "male",
+      birthday: "",
+      phone: "",
+      address: "",
+      isActive: true,
     });
+    setAvatarFile(null);
+    setAvatarPreview("");
   };
 
   const validatePassword = (password: string): string | null => {
@@ -181,30 +220,60 @@ export function UserManagement() {
 
     try {
       if (editingUser) {
-        // Update existing user
-        const updateDto: any = {
-          name: formData.name,
-          email: formData.email,
-          role: formData.role,
-        };
+        // Update existing user - use FormData for file upload
+        const updateFormData = new FormData();
+        updateFormData.append("name", formData.name);
+        updateFormData.append("email", formData.email);
+        updateFormData.append("role", formData.role);
+        updateFormData.append("gender", formData.gender);
+        updateFormData.append("isActive", String(formData.isActive));
+
+        if (formData.birthday) {
+          updateFormData.append("birthday", formData.birthday);
+        }
+        if (formData.phone) {
+          updateFormData.append("phone", formData.phone);
+        }
+        if (formData.address) {
+          updateFormData.append("address", formData.address);
+        }
 
         // Only include password if it's provided
         if (formData.password) {
-          updateDto.password = formData.password;
+          updateFormData.append("password", formData.password);
         }
 
-        await usersApi.update(editingUser.id, updateDto);
+        // Only include avatar if a new file is selected
+        if (avatarFile) {
+          updateFormData.append("avatar", avatarFile);
+        }
+
+        await usersApi.update(editingUser.id, updateFormData);
         alert("Cập nhật người dùng thành công!");
       } else {
-        // Create new user
-        const createDto: CreateUserDto = {
-          name: formData.name,
-          email: formData.email,
-          password: formData.password,
-          role: formData.role,
-        };
+        // Create new user - use FormData for file upload
+        const createFormData = new FormData();
+        createFormData.append("name", formData.name);
+        createFormData.append("email", formData.email);
+        createFormData.append("password", formData.password);
+        createFormData.append("role", formData.role);
+        createFormData.append("gender", formData.gender);
+        createFormData.append("isActive", String(formData.isActive));
 
-        await usersApi.create(createDto);
+        if (formData.birthday) {
+          createFormData.append("birthday", formData.birthday);
+        }
+        if (formData.phone) {
+          createFormData.append("phone", formData.phone);
+        }
+        if (formData.address) {
+          createFormData.append("address", formData.address);
+        }
+        if (avatarFile) {
+          createFormData.append("avatar", avatarFile);
+        }
+
+        await usersApi.create(createFormData);
         alert("Thêm người dùng thành công!");
       }
 
@@ -300,7 +369,7 @@ export function UserManagement() {
               Thêm người dùng
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[500px]">
+          <DialogContent className="w-[90vw] max-w-[700px] max-h-[85vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>
                 {editingUser ? "Chỉnh sửa người dùng" : "Thêm người dùng mới"}
@@ -312,91 +381,232 @@ export function UserManagement() {
               </DialogDescription>
             </DialogHeader>
 
-            <div className="space-y-4 py-4">
-              {/* Name */}
-              <div className="space-y-2">
-                <Label htmlFor="name">Họ và tên *</Label>
-                <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) =>
-                    setFormData({ ...formData, name: e.target.value })
-                  }
-                  placeholder="Nguyễn Văn A"
-                />
+            {/* 2-column layout */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4">
+              {/* Left Column - Form Fields */}
+              <div className="space-y-4">
+                {/* Name */}
+                <div className="space-y-2">
+                  <Label htmlFor="name">Họ và tên *</Label>
+                  <Input
+                    id="name"
+                    value={formData.name}
+                    onChange={(e) =>
+                      setFormData({ ...formData, name: e.target.value })
+                    }
+                    placeholder="Nguyễn Văn A"
+                  />
+                </div>
+
+                {/* Email */}
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email *</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) =>
+                      setFormData({ ...formData, email: e.target.value })
+                    }
+                    placeholder="user@example.com"
+                  />
+                </div>
+
+                {/* Gender */}
+                <div className="space-y-2">
+                  <Label>Giới tính *</Label>
+                  <Select
+                    value={formData.gender}
+                    onValueChange={(value: "male" | "female") =>
+                      setFormData({ ...formData, gender: value })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="male">👨 Nam</SelectItem>
+                      <SelectItem value="female">👩 Nữ</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Birthday */}
+                <div className="space-y-2">
+                  <Label htmlFor="birthday">Ngày sinh</Label>
+                  <Input
+                    id="birthday"
+                    type="date"
+                    value={formData.birthday}
+                    onChange={(e) =>
+                      setFormData({ ...formData, birthday: e.target.value })
+                    }
+                  />
+                </div>
+
+                {/* Phone */}
+                <div className="space-y-2">
+                  <Label htmlFor="phone">Số điện thoại</Label>
+                  <Input
+                    id="phone"
+                    type="tel"
+                    value={formData.phone}
+                    onChange={(e) =>
+                      setFormData({ ...formData, phone: e.target.value })
+                    }
+                    placeholder="0912345678"
+                  />
+                </div>
+
+                {/* Address */}
+                <div className="space-y-2">
+                  <Label htmlFor="address">Địa chỉ</Label>
+                  <Input
+                    id="address"
+                    value={formData.address}
+                    onChange={(e) =>
+                      setFormData({ ...formData, address: e.target.value })
+                    }
+                    placeholder="123 Đường ABC, Quận XYZ"
+                  />
+                </div>
+
+                {/* Password */}
+                <div className="space-y-2">
+                  <Label htmlFor="password">
+                    Mật khẩu {editingUser ? "(Để trống nếu không đổi)" : "*"}
+                  </Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    value={formData.password}
+                    onChange={(e) =>
+                      setFormData({ ...formData, password: e.target.value })
+                    }
+                    placeholder="••••••••"
+                  />
+                  <p className="text-xs text-amber-600">
+                    Tối thiểu 8 ký tự, bao gồm chữ hoa, chữ thường, số và ký tự
+                    đặc biệt
+                  </p>
+                </div>
+
+                {/* Confirm Password */}
+                <div className="space-y-2">
+                  <Label htmlFor="confirmPassword">
+                    Xác nhận mật khẩu{" "}
+                    {editingUser && !formData.password ? "" : "*"}
+                  </Label>
+                  <Input
+                    id="confirmPassword"
+                    type="password"
+                    value={formData.confirmPassword}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        confirmPassword: e.target.value,
+                      })
+                    }
+                    placeholder="••••••••"
+                  />
+                </div>
               </div>
 
-              {/* Email */}
-              <div className="space-y-2">
-                <Label htmlFor="email">Email *</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) =>
-                    setFormData({ ...formData, email: e.target.value })
-                  }
-                  placeholder="user@example.com"
-                />
-              </div>
+              {/* Right Column - Avatar & Role */}
+              <div className="space-y-4">
+                {/* Avatar Upload */}
+                <div className="space-y-2">
+                  <Label>Ảnh đại diện</Label>
 
-              {/* Password */}
-              <div className="space-y-2">
-                <Label htmlFor="password">
-                  Mật khẩu {editingUser ? "(Để trống nếu không đổi)" : "*"}
-                </Label>
-                <Input
-                  id="password"
-                  type="password"
-                  value={formData.password}
-                  onChange={(e) =>
-                    setFormData({ ...formData, password: e.target.value })
-                  }
-                  placeholder="••••••••"
-                />
-                <p className="text-xs text-amber-600">
-                  Tối thiểu 8 ký tự, bao gồm chữ hoa, chữ thường, số và ký tự
-                  đặc biệt
-                </p>
-              </div>
+                  {/* Avatar Preview */}
+                  <div className="relative aspect-square w-full max-w-[180px] mx-auto rounded-full overflow-hidden border-2 border-orange-200 bg-gray-50">
+                    <img
+                      src={
+                        avatarPreview ||
+                        (editingUser?.avatar
+                          ? editingUser.avatar
+                          : "/default/default-avatar.jpg")
+                      }
+                      alt="Avatar preview"
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        e.currentTarget.src = "/default/default-avatar.jpg";
+                      }}
+                    />
+                  </div>
 
-              {/* Confirm Password */}
-              <div className="space-y-2">
-                <Label htmlFor="confirmPassword">
-                  Xác nhận mật khẩu{" "}
-                  {editingUser && !formData.password ? "" : "*"}
-                </Label>
-                <Input
-                  id="confirmPassword"
-                  type="password"
-                  value={formData.confirmPassword}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      confirmPassword: e.target.value,
-                    })
-                  }
-                  placeholder="••••••••"
-                />
-              </div>
+                  {/* Upload Button */}
+                  <div className="space-y-2">
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          setAvatarFile(file);
+                          const reader = new FileReader();
+                          reader.onloadend = () => {
+                            setAvatarPreview(reader.result as string);
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }}
+                    />
 
-              {/* Role */}
-              <div className="space-y-2">
-                <Label>Vai trò</Label>
-                <Select
-                  value={formData.role}
-                  onValueChange={(value: "admin" | "staff") =>
-                    setFormData({ ...formData, role: value })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="admin">👑 Quản trị viên</SelectItem>
-                    <SelectItem value="staff">👤 Nhân viên</SelectItem>
-                  </SelectContent>
-                </Select>
+                    <Button
+                      variant="outline"
+                      className="w-full flex items-center justify-center gap-2 border-dashed border-2 border-orange-200 hover:bg-orange-50"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <ImagePlus className="h-4 w-4 text-amber-600" />
+                      {editingUser ? "Thay ảnh" : "Thêm ảnh"}
+                    </Button>
+
+                    <p className="text-xs text-amber-600 text-center">
+                      JPG, PNG (tối đa 5MB)
+                    </p>
+                  </div>
+                </div>
+
+                {/* Role */}
+                <div className="space-y-2">
+                  <Label>Vai trò *</Label>
+                  <Select
+                    value={formData.role}
+                    onValueChange={(value: "admin" | "staff") =>
+                      setFormData({ ...formData, role: value })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="admin">👑 Quản trị viên</SelectItem>
+                      <SelectItem value="staff">👤 Nhân viên</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Is Active */}
+                <div className="space-y-2">
+                  <Label>Trạng thái</Label>
+                  <Select
+                    value={formData.isActive ? "true" : "false"}
+                    onValueChange={(value) =>
+                      setFormData({ ...formData, isActive: value === "true" })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="true">✅ Hoạt động</SelectItem>
+                      <SelectItem value="false">❌ Không hoạt động</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </div>
 

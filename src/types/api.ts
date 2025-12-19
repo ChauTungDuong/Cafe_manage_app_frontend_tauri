@@ -194,6 +194,9 @@ export interface CreateTaxDto {
   description?: string;
   percent: number;
   type: "tax" | "discount";
+  isActive?: boolean;
+  applyFrom?: string;
+  applyTo?: string;
 }
 
 export interface CreateOrderDto {

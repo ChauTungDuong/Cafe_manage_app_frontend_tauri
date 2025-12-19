@@ -175,28 +175,55 @@ export function RevenueDashboard() {
     statisticsCount: statistics.length,
   });
 
-  // Prepare chart data
-  const chartData: ChartData[] = statistics
-    .slice()
-    .reverse()
-    .slice(0, period === "daily" ? 7 : 6)
-    .map((stat) => {
-      const date = new Date(stat.date);
-      let label = "";
+  // Prepare chart data - always show full week (Mon-Sun) or full year (12 months)
+  const chartData: ChartData[] = (() => {
+    if (period === "daily") {
+      // Show full week Monday to Sunday
+      const days = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"];
+      const weekData: ChartData[] = days.map((dayLabel, index) => ({
+        day: dayLabel,
+        sales: 0,
+        count: 0,
+      }));
 
-      if (period === "daily") {
-        const days = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
-        label = days[date.getDay()];
-      } else {
-        label = `T${date.getMonth() + 1}`;
-      }
+      // Map statistics to correct day of week
+      statistics.forEach((stat) => {
+        const date = new Date(stat.date);
+        const dayOfWeek = date.getDay(); // 0=Sunday, 1=Monday, ..., 6=Saturday
+        // Convert to Monday=0, Tuesday=1, ..., Sunday=6
+        const dayIndex = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
 
-      return {
-        day: label,
-        sales: stat.totalRevenue,
-        count: stat.totalOrders,
-      };
-    });
+        weekData[dayIndex] = {
+          day: days[dayIndex],
+          sales: (weekData[dayIndex].sales || 0) + stat.totalRevenue,
+          count: (weekData[dayIndex].count || 0) + stat.totalOrders,
+        };
+      });
+
+      return weekData;
+    } else {
+      // Show full 12 months
+      const monthData: ChartData[] = Array.from({ length: 12 }, (_, i) => ({
+        day: `T${i + 1}`,
+        sales: 0,
+        count: 0,
+      }));
+
+      // Map statistics to correct month
+      statistics.forEach((stat) => {
+        const date = new Date(stat.date);
+        const monthIndex = date.getMonth(); // 0-11
+
+        monthData[monthIndex] = {
+          day: `T${monthIndex + 1}`,
+          sales: (monthData[monthIndex].sales || 0) + stat.totalRevenue,
+          count: (monthData[monthIndex].count || 0) + stat.totalOrders,
+        };
+      });
+
+      return monthData;
+    }
+  })();
 
   // Aggregate top products across all statistics
   const getTopProducts = () => {

@@ -33,6 +33,9 @@ export function TaxManagement() {
     percent: 0,
     description: "",
     type: "tax",
+    isActive: true,
+    applyFrom: "",
+    applyTo: "",
   });
 
   useEffect(() => {
@@ -63,6 +66,13 @@ export function TaxManagement() {
         percent: Number(tax.percent),
         description: tax.description || "",
         type: tax.type,
+        isActive: tax.isActive !== false,
+        applyFrom: tax.applyFrom
+          ? new Date(tax.applyFrom).toISOString().split("T")[0]
+          : "",
+        applyTo: tax.applyTo
+          ? new Date(tax.applyTo).toISOString().split("T")[0]
+          : "",
       });
     } else {
       setEditingTax(null);
@@ -71,6 +81,9 @@ export function TaxManagement() {
         percent: 0,
         description: "",
         type: "tax",
+        isActive: true,
+        applyFrom: "",
+        applyTo: "",
       });
     }
     setIsDialogOpen(true);
@@ -79,7 +92,15 @@ export function TaxManagement() {
   const handleCloseDialog = () => {
     setIsDialogOpen(false);
     setEditingTax(null);
-    setFormData({ name: "", percent: 0, description: "", type: "tax" });
+    setFormData({
+      name: "",
+      percent: 0,
+      description: "",
+      type: "tax",
+      isActive: true,
+      applyFrom: "",
+      applyTo: "",
+    });
   };
 
   const handleSave = async () => {
@@ -298,6 +319,48 @@ export function TaxManagement() {
                   }
                   placeholder="Mô tả chi tiết về thuế/phí này..."
                   rows={3}
+                />
+              </div>
+
+              {/* Is Active */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between p-3 border-2 border-orange-200 rounded-lg bg-orange-50/30">
+                  <Label htmlFor="isActive" className="cursor-pointer mb-0">
+                    Kích hoạt
+                  </Label>
+                  <Switch
+                    id="isActive"
+                    checked={formData.isActive}
+                    onCheckedChange={(checked) =>
+                      setFormData({ ...formData, isActive: checked })
+                    }
+                  />
+                </div>
+              </div>
+
+              {/* Apply From */}
+              <div className="space-y-2">
+                <Label htmlFor="applyFrom">Áp dụng từ ngày (tùy chọn)</Label>
+                <Input
+                  id="applyFrom"
+                  type="date"
+                  value={formData.applyFrom}
+                  onChange={(e) =>
+                    setFormData({ ...formData, applyFrom: e.target.value })
+                  }
+                />
+              </div>
+
+              {/* Apply To */}
+              <div className="space-y-2">
+                <Label htmlFor="applyTo">Áp dụng đến ngày (tùy chọn)</Label>
+                <Input
+                  id="applyTo"
+                  type="date"
+                  value={formData.applyTo}
+                  onChange={(e) =>
+                    setFormData({ ...formData, applyTo: e.target.value })
+                  }
                 />
               </div>
             </div>
