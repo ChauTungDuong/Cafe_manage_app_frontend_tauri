@@ -332,20 +332,20 @@ export function TableManagement() {
       )}
 
       {/* Statistics */}
-      <div className="grid grid-cols-3 gap-4">
-        <Card className="p-4 border-2 border-green-200 bg-green-50">
+      <div className="flex flex-row gap-4">
+        <Card className="flex-1 p-4 border-2 border-green-200 bg-green-50">
           <p className="text-sm text-green-700 mb-1">Bàn trống</p>
           <p className="text-2xl font-bold text-green-800">
             {availableTables.length}
           </p>
         </Card>
-        <Card className="p-4 border-2 border-red-200 bg-red-50">
+        <Card className="flex-1 p-4 border-2 border-red-200 bg-red-50">
           <p className="text-sm text-red-700 mb-1">Đang dùng</p>
           <p className="text-2xl font-bold text-red-800">
             {occupiedTables.length}
           </p>
         </Card>
-        <Card className="p-4 border-2 border-yellow-200 bg-yellow-50">
+        <Card className="flex-1 p-4 border-2 border-yellow-200 bg-yellow-50">
           <p className="text-sm text-yellow-700 mb-1">Đã đặt</p>
           <p className="text-2xl font-bold text-yellow-800">
             {reservedTables.length}

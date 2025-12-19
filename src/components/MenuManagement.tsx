@@ -1099,11 +1099,11 @@ export function MenuManagement() {
                     <Card
                       key={item.id}
                       className="overflow-hidden hover:shadow-xl transition-all border-2 border-orange-100 hover:border-orange-300 rounded-2xl flex flex-col"
-                      style={{ height: "480px" }}
+                      style={{ height: "490px" }}
                     >
                       <div
                         className="relative bg-gradient-to-br from-orange-50 to-amber-50 flex-shrink-0"
-                        style={{ height: "240px" }}
+                        style={{ height: "270px" }}
                       >
                         <ImageWithFallback
                           src={
@@ -1111,7 +1111,7 @@ export function MenuManagement() {
                             `https://images.unsplash.com/photo-1635090976010-d3f6dfbb1bac?w=400`
                           }
                           alt={item.name}
-                          className="w-full h-full object-cover"
+                          className="w-full h-full object-contain"
                         />
                         {/* Status Badge */}
                         <div className="absolute top-2 right-2">
@@ -1127,8 +1127,8 @@ export function MenuManagement() {
                         </div>
                       </div>
                       <div
-                        className="p-4 flex flex-col"
-                        style={{ height: "240px" }}
+                        className="px-4 pb-4 pt-2 flex flex-col"
+                        style={{ height: "220px" }}
                       >
                         <div className="flex-grow">
                           <h4

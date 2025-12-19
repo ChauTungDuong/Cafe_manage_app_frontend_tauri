@@ -343,8 +343,8 @@ export function TaxManagement() {
       )}
 
       {/* Statistics */}
-      <div className="grid grid-cols-3 gap-4">
-        <Card className="p-4 border-2 border-blue-200 bg-blue-50">
+      <div className="flex flex-row gap-4">
+        <Card className="flex-1 p-4 border-2 border-blue-200 bg-blue-50">
           <div className="flex items-center gap-3">
             <Percent className="h-8 w-8 text-blue-600" />
             <div>
@@ -353,7 +353,7 @@ export function TaxManagement() {
             </div>
           </div>
         </Card>
-        <Card className="p-4 border-2 border-purple-200 bg-purple-50">
+        <Card className="flex-1 p-4 border-2 border-purple-200 bg-purple-50">
           <div className="flex items-center gap-3">
             <Percent className="h-8 w-8 text-purple-600" />
             <div>
@@ -364,7 +364,7 @@ export function TaxManagement() {
             </div>
           </div>
         </Card>
-        <Card className="p-4 border-2 border-green-200 bg-green-50">
+        <Card className="flex-1 p-4 border-2 border-green-200 bg-green-50">
           <div className="flex items-center gap-3">
             <Percent className="h-8 w-8 text-green-600" />
             <div>
