@@ -23,6 +23,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "./ui/dialog";
@@ -704,6 +705,24 @@ export function MenuManagement() {
   try {
     return (
       <div className="space-y-6">
+        {/* Custom styles for tabs */}
+        <style>{`
+          [data-slot="tabs-trigger"][data-state="active"] {
+            background: linear-gradient(to right, #ff6a00, #ff7a20) !important;
+            color: white !important;
+            font-weight: 600 !important;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1) !important;
+          }
+          [data-slot="tabs-trigger"][data-state="inactive"] {
+            background-color: white;
+            color: rgb(75 85 99);
+          }
+          [data-slot="tabs-trigger"][data-state="inactive"]:hover {
+            background-color: rgb(255 247 237);
+            color: rgb(234 88 12);
+          }
+        `}</style>
+        
         {/* Header */}
         <div className="flex justify-between items-center flex-wrap gap-4">
           <div>
@@ -728,21 +747,21 @@ export function MenuManagement() {
           <TabsList className="inline-flex h-auto items-center justify-center bg-orange-50/50 p-2 gap-2 w-full rounded-xl border-2 border-orange-100">
             <TabsTrigger
               value="products"
-              className="flex-1 h-11 px-6 text-sm font-medium rounded-lg transition-all data-[state=inactive]:bg-white data-[state=inactive]:text-gray-600 data-[state=inactive]:hover:text-orange-600 data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-amber-600 data-[state=active]:text-white shadow-sm"
+              className="flex-1 h-11 px-6 text-sm font-medium rounded-lg transition-all duration-200 data-[state=inactive]:bg-white data-[state=inactive]:text-gray-600 hover:bg-orange-50 hover:text-orange-600 data-[state=active]:bg-orange-50 data-[state=active]:text-orange-600 data-[state=active]:font-semibold data-[state=active]:shadow-sm"
             >
               <Package className="h-4 w-4 mr-2" />
               Sản phẩm
             </TabsTrigger>
             <TabsTrigger
               value="categories"
-              className="flex-1 h-11 px-6 text-sm font-medium rounded-lg transition-all data-[state=inactive]:bg-white data-[state=inactive]:text-gray-600 data-[state=inactive]:hover:text-orange-600 data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-amber-600 data-[state=active]:text-white shadow-sm"
+              className="flex-1 h-11 px-6 text-sm font-medium rounded-lg transition-all duration-200 data-[state=inactive]:bg-white data-[state=inactive]:text-gray-600 hover:bg-orange-50 hover:text-orange-600 data-[state=active]:bg-orange-50 data-[state=active]:text-orange-600 data-[state=active]:font-semibold data-[state=active]:shadow-sm"
             >
               <Package className="h-4 w-4 mr-2" />
               Danh mục
             </TabsTrigger>
             <TabsTrigger
               value="recipes"
-              className="flex-1 h-11 px-6 text-sm font-medium rounded-lg transition-all data-[state=inactive]:bg-white data-[state=inactive]:text-gray-600 data-[state=inactive]:hover:text-orange-600 data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-amber-600 data-[state=active]:text-white shadow-sm"
+              className="flex-1 h-11 px-6 text-sm font-medium rounded-lg transition-all duration-200 data-[state=inactive]:bg-white data-[state=inactive]:text-gray-600 hover:bg-orange-50 hover:text-orange-600 data-[state=active]:bg-orange-50 data-[state=active]:text-orange-600 data-[state=active]:font-semibold data-[state=active]:shadow-sm"
             >
               <ChefHat className="h-4 w-4 mr-2" />
               Công thức
@@ -1483,104 +1502,88 @@ export function MenuManagement() {
           open={isRecipeTabFormOpen}
           onOpenChange={setIsRecipeTabFormOpen}
         >
-          <DialogContent className="max-w-6xl w-[95vw] h-[75vh] !bg-white dark:bg-zinc-900 p-0 overflow-hidden rounded-2xl border-orange-100 dark:border-zinc-800">
-            {/* Header */}
-            <div className="flex items-center justify-between px-8 py-5 border-b border-orange-100 dark:border-zinc-800 bg-white dark:bg-zinc-800/50">
-              <div>
-                <DialogTitle className="text-2xl font-bold text-amber-900 dark:text-white">
-                  {editingRecipeInTab
-                    ? "Chỉnh sửa công thức"
-                    : "Thêm công thức mới"}
-                </DialogTitle>
-                <p className="text-sm text-amber-700/70 dark:text-amber-500/70 mt-1">
-                  Cập nhật thành phần và định lượng cho món:{" "}
-                  <span className="font-semibold text-orange-600">
-                    {items.find((i) => i.id === recipeTabFormData.itemId)
-                      ?.name || "Chưa chọn món"}
-                  </span>
-                </p>
-              </div>
-              <Button
-                variant="ghost"
-                className="p-2 rounded-full hover:bg-orange-50 dark:hover:bg-zinc-700 text-gray-400 hover:text-orange-600 transition-colors"
-                onClick={() => setIsRecipeTabFormOpen(false)}
-              >
-                <X className="h-6 w-6" />
-              </Button>
-            </div>
+          <DialogContent 
+            className="w-[95vw] max-w-[900px] p-0" 
+            style={{ 
+              display: 'flex', 
+              flexDirection: 'column',
+              height: '600px',
+              maxHeight: '600px',
+            }}
+          >
+            <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0 border-b">
+              <DialogTitle>
+                {editingRecipeInTab
+                  ? "Chỉnh sửa công thức"
+                  : "Thêm công thức mới"}
+              </DialogTitle>
+              <DialogDescription>
+                {editingRecipeInTab
+                  ? "Cập nhật thông tin và nguyên liệu cho công thức"
+                  : `Tạo công thức pha chế cho món: ${
+                      items.find((i) => i.id === recipeTabFormData.itemId)
+                        ?.name || "Chưa chọn món"
+                    }`}
+              </DialogDescription>
+            </DialogHeader>
 
-            {/* Body */}
-            <div className="flex-1 overflow-y-auto p-8 custom-scrollbar !bg-orange-50/20 dark:bg-[#18181b]/50">
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 h-full">
+            {/* Scrollable Content */}
+            <div className="flex-1 overflow-hidden px-6">
+              <ScrollArea className="h-full">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 py-4">
                 {/* Left Column - Info */}
-                <div className="lg:col-span-1 flex flex-col gap-6">
-                  <div className="bg-white dark:bg-zinc-800 p-6 rounded-xl shadow-sm border border-orange-100 dark:border-zinc-700">
-                    <h4 className="font-bold text-lg text-amber-900 dark:text-white mb-4 flex items-center gap-2">
-                      <Info className="h-5 w-5 text-orange-500" />
-                      Thông tin chi tiết
-                    </h4>
-                    <div className="space-y-5">
-                      {/* Recipe Name */}
-                      <div>
-                        <Label className="block text-sm font-medium text-amber-800 dark:text-amber-200 mb-2">
-                          Tên công thức <span className="text-red-500">*</span>
-                        </Label>
-                        <Input
-                          value={recipeTabFormData.name}
-                          onChange={(e) =>
-                            setRecipeTabFormData({
-                              ...recipeTabFormData,
-                              name: e.target.value,
-                            })
-                          }
-                          className="bg-orange-50/30 dark:bg-zinc-900 border-orange-100 dark:border-zinc-700 focus:ring-orange-500 focus:border-orange-500"
-                          placeholder="Nhập tên công thức..."
-                        />
-                      </div>
+                <div className="lg:col-span-1 space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="recipeName">
+                      Tên công thức <span className="text-red-500">*</span>
+                    </Label>
+                    <Input
+                      id="recipeName"
+                      value={recipeTabFormData.name}
+                      onChange={(e) =>
+                        setRecipeTabFormData({
+                          ...recipeTabFormData,
+                          name: e.target.value,
+                        })
+                      }
+                      placeholder="VD: Công thức Cappuccino"
+                    />
+                  </div>
 
-                      {/* Select Item */}
-                      <div>
-                        <Label className="block text-sm font-medium text-amber-800 dark:text-amber-200 mb-2">
-                          Chọn món <span className="text-red-500">*</span>
-                        </Label>
-                        <div className="relative">
-                          <Select
-                            value={recipeTabFormData.itemId}
-                            onValueChange={(value) =>
-                              setRecipeTabFormData({
-                                ...recipeTabFormData,
-                                itemId: value,
-                              })
-                            }
-                            disabled={!!editingRecipeInTab}
-                          >
-                            <SelectTrigger className="w-full bg-orange-50/30 dark:bg-zinc-900 border border-orange-100 dark:border-zinc-700 rounded-lg py-2.5 px-3 focus:ring-orange-500 focus:border-orange-500 text-amber-900 dark:text-white text-sm">
-                              <SelectValue placeholder="Chọn món" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {items.map((item) => (
-                                <SelectItem key={item.id} value={item.id}>
-                                  {item.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-                    </div>
+                  <div className="space-y-2">
+                    <Label>
+                      Chọn món <span className="text-red-500">*</span>
+                    </Label>
+                    <Select
+                      value={recipeTabFormData.itemId}
+                      onValueChange={(value) =>
+                        setRecipeTabFormData({
+                          ...recipeTabFormData,
+                          itemId: value,
+                        })
+                      }
+                      disabled={!!editingRecipeInTab}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Chọn món" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {items.map((item) => (
+                          <SelectItem key={item.id} value={item.id}>
+                            {item.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
 
                 {/* Right Column - Ingredients */}
-                <div className="lg:col-span-2 flex flex-col gap-6">
+                <div className="lg:col-span-2 space-y-4">
                   <div className="flex items-center justify-between">
-                    <h4 className="font-bold text-lg text-amber-900 dark:text-white flex items-center gap-2">
-                      <Refrigerator className="h-5 w-5 text-orange-500" />
-                      Nguyên liệu thành phần
-                      <span className="bg-orange-100 dark:bg-orange-900/30 text-orange-600 text-xs px-2 py-0.5 rounded-full">
-                        {recipeTabFormData.ingredients.length} items
-                      </span>
-                    </h4>
+                    <Label className="text-base font-semibold">
+                      Nguyên liệu thành phần ({recipeTabFormData.ingredients.length})
+                    </Label>
                     <Button
                       onClick={() =>
                         setRecipeTabFormData({
@@ -1591,139 +1594,128 @@ export function MenuManagement() {
                           ],
                         })
                       }
-                      className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium shadow-sm transition-all active:scale-95"
+                      variant="outline"
+                      size="sm"
+                      className="flex items-center gap-2"
                     >
                       <Plus className="h-4 w-4" />
                       Thêm nguyên liệu
                     </Button>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-3">
                     {recipeTabFormData.ingredients.map((ing, index) => (
                       <div
                         key={index}
-                        className="bg-white dark:bg-zinc-800 p-4 rounded-xl border border-orange-100 dark:border-zinc-700 hover:border-orange-500 dark:hover:border-orange-500 transition-colors group relative"
+                        className="p-4 border rounded-lg space-y-3 relative group"
                       >
-                        <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
-                          <button
-                            onClick={() => {
-                              const newIngredients = [
-                                ...recipeTabFormData.ingredients,
-                              ];
-                              newIngredients.splice(index, 1);
-                              setRecipeTabFormData({
-                                ...recipeTabFormData,
-                                ingredients: newIngredients,
-                              });
-                            }}
-                            className="p-1.5 text-gray-400 hover:text-red-500 rounded-full hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
-                        <div className="flex items-start gap-4">
-                          <div className="w-10 h-10 rounded-lg bg-orange-100 dark:bg-zinc-700 flex items-center justify-center text-orange-600 flex-shrink-0">
-                            <Coffee className="h-5 w-5" />
+                        <button
+                          onClick={() => {
+                            const newIngredients = [
+                              ...recipeTabFormData.ingredients,
+                            ];
+                            newIngredients.splice(index, 1);
+                            setRecipeTabFormData({
+                              ...recipeTabFormData,
+                              ingredients: newIngredients,
+                            });
+                          }}
+                          className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity p-1 text-gray-400 hover:text-red-500"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label className="text-xs">Nguyên liệu</Label>
+                            <Select
+                              value={ing.ingredientId}
+                              onValueChange={(value) => {
+                                const newIngredients = [
+                                  ...recipeTabFormData.ingredients,
+                                ];
+                                newIngredients[index].ingredientId = value;
+                                setRecipeTabFormData({
+                                  ...recipeTabFormData,
+                                  ingredients: newIngredients,
+                                });
+                              }}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Chọn nguyên liệu" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {ingredients.map((i) => (
+                                  <SelectItem key={i.id} value={i.id}>
+                                    {i.name} ({i.measureUnit})
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                           </div>
-                          <div className="flex-1 space-y-3">
-                            <div>
-                              <Label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">
-                                Nguyên liệu
-                              </Label>
-                              <Select
-                                value={ing.ingredientId}
-                                onValueChange={(value) => {
-                                  const newIngredients = [
-                                    ...recipeTabFormData.ingredients,
-                                  ];
-                                  newIngredients[index].ingredientId = value;
-                                  setRecipeTabFormData({
-                                    ...recipeTabFormData,
-                                    ingredients: newIngredients,
-                                  });
-                                }}
-                              >
-                                <SelectTrigger className="w-full bg-transparent border-0 border-b border-gray-200 dark:border-zinc-700 py-1 px-0 text-sm font-semibold text-amber-900 dark:text-white focus:ring-0 focus:border-orange-500 h-auto rounded-none shadow-none">
-                                  <SelectValue placeholder="Chọn nguyên liệu" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {ingredients.map((i) => (
-                                    <SelectItem key={i.id} value={i.id}>
-                                      {i.name} ({i.measureUnit})
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <div className="flex-1">
-                                <Label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">
-                                  Số lượng
-                                </Label>
-                                <Input
-                                  type="number"
-                                  value={ing.amount}
-                                  onChange={(e) => {
-                                    const newIngredients = [
-                                      ...recipeTabFormData.ingredients,
-                                    ];
-                                    newIngredients[index].amount = Number(
-                                      e.target.value
-                                    );
-                                    setRecipeTabFormData({
-                                      ...recipeTabFormData,
-                                      ingredients: newIngredients,
-                                    });
-                                  }}
-                                  className="w-full bg-gray-50 dark:bg-zinc-900 border-none rounded-md py-1.5 px-3 text-sm font-medium focus:ring-2 focus:ring-orange-500/50"
-                                />
-                              </div>
-                              <span className="text-sm text-gray-500 dark:text-gray-400 mt-5">
-                                {ingredients.find(
-                                  (i) => i.id === ing.ingredientId
-                                )?.measureUnit || "đơn vị"}
-                              </span>
-                            </div>
+                          <div className="space-y-2">
+                            <Label className="text-xs">
+                              Số lượng{" "}
+                              {ingredients.find(
+                                (i) => i.id === ing.ingredientId
+                              )?.measureUnit && (
+                                <span className="text-gray-500">
+                                  (
+                                  {
+                                    ingredients.find(
+                                      (i) => i.id === ing.ingredientId
+                                    )?.measureUnit
+                                  }
+                                  )
+                                </span>
+                              )}
+                            </Label>
+                            <Input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={ing.amount}
+                              onChange={(e) => {
+                                const newIngredients = [
+                                  ...recipeTabFormData.ingredients,
+                                ];
+                                newIngredients[index].amount = Number(
+                                  e.target.value
+                                );
+                                setRecipeTabFormData({
+                                  ...recipeTabFormData,
+                                  ingredients: newIngredients,
+                                });
+                              }}
+                              placeholder="0"
+                            />
                           </div>
                         </div>
                       </div>
                     ))}
 
-                    {/* Add New Card Button */}
-                    <button
-                      onClick={() =>
-                        setRecipeTabFormData({
-                          ...recipeTabFormData,
-                          ingredients: [
-                            ...recipeTabFormData.ingredients,
-                            { ingredientId: "", amount: 0 },
-                          ],
-                        })
-                      }
-                      className="bg-transparent border-2 border-dashed border-gray-200 dark:border-zinc-700 p-4 rounded-xl flex flex-col items-center justify-center gap-2 hover:border-orange-500 hover:bg-orange-50/30 dark:hover:bg-zinc-800 transition-all group min-h-[160px]"
-                    >
-                      <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-zinc-800 flex items-center justify-center text-gray-400 group-hover:text-orange-500 group-hover:bg-white dark:group-hover:bg-zinc-700 transition-colors">
-                        <Plus className="h-5 w-5" />
+                    {recipeTabFormData.ingredients.length === 0 && (
+                      <div className="text-center py-8 border-2 border-dashed rounded-lg text-gray-500">
+                        <Refrigerator className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                        <p className="text-sm">Chưa có nguyên liệu nào</p>
                       </div>
-                      <span className="text-sm font-medium text-gray-500 dark:text-gray-400 group-hover:text-orange-500">
-                        Thêm thành phần khác
-                      </span>
-                    </button>
+                    )}
                   </div>
                 </div>
               </div>
+              </ScrollArea>
             </div>
 
-            {/* Footer */}
-            <div className="px-8 py-5 border-t border-orange-100 dark:border-zinc-800 bg-white dark:bg-zinc-800 flex justify-end gap-4">
+            <div className="flex gap-3 pt-4 border-t flex-shrink-0 px-6 pb-6">
               <Button
                 variant="outline"
+                className="flex-1"
                 onClick={() => setIsRecipeTabFormOpen(false)}
-                className="px-6 py-2.5 rounded-lg border border-gray-200 dark:border-zinc-700 text-gray-600 dark:text-gray-300 font-medium hover:bg-gray-50 dark:hover:bg-zinc-700 transition-colors h-auto"
+                disabled={isSaving}
               >
                 Hủy
               </Button>
               <Button
+                className="flex-1 bg-gradient-to-r from-orange-500 to-amber-600"
                 onClick={async () => {
                   if (!recipeTabFormData.name.trim()) {
                     alert("Vui lòng nhập tên công thức!");
@@ -1769,17 +1761,16 @@ export function MenuManagement() {
                     setIsSaving(false);
                   }
                 }}
-                className="px-6 py-2.5 rounded-lg bg-orange-500 text-white font-medium shadow-lg shadow-orange-200/50 dark:shadow-none hover:bg-orange-600 hover:scale-[1.02] transition-all h-auto"
                 disabled={isSaving}
               >
-                <div className="flex items-center gap-2">
-                  {isSaving ? (
-                    <Loader2 className="h-5 w-5 animate-spin" />
-                  ) : (
-                    <Save className="h-5 w-5" />
-                  )}
-                  {isSaving ? "Đang lưu..." : "Lưu công thức"}
-                </div>
+                {isSaving ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Đang lưu...
+                  </>
+                ) : (
+                  "Lưu"
+                )}
               </Button>
             </div>
           </DialogContent>
@@ -1914,9 +1905,9 @@ export function MenuManagement() {
           open={isRecipeFormDialogOpen}
           onOpenChange={setIsRecipeFormDialogOpen}
         >
-          <DialogContent className="max-w-5xl w-[90vw] h-[80vh] !bg-white p-0 overflow-hidden rounded-2xl border-2 border-orange-200">
+          <DialogContent className="max-w-5xl w-[90vw] max-h-[90vh] !bg-white p-0 overflow-hidden rounded-2xl border-2 border-orange-200 flex flex-col">
             {/* Header */}
-            <div className="flex items-center justify-between px-8 py-6 border-b-2 border-orange-200 bg-white">
+            <div className="flex items-center justify-between px-8 py-6 border-b-2 border-orange-200 bg-white flex-shrink-0">
               <div className="flex-1">
                 <DialogTitle className="text-2xl font-bold text-amber-900 flex items-center gap-3">
                   <div className="p-2 bg-gradient-to-br from-orange-500 to-amber-600 rounded-xl">
@@ -1933,18 +1924,11 @@ export function MenuManagement() {
                   </span>
                 </DialogDescription>
               </div>
-              <Button
-                variant="ghost"
-                className="p-2 rounded-full hover:bg-orange-100 text-gray-400 hover:text-orange-600 transition-all"
-                onClick={handleCloseRecipeForm}
-              >
-                <X className="h-6 w-6" />
-              </Button>
             </div>
 
             {/* Body - 2 Column Layout */}
-            <div className="flex-1 overflow-y-auto p-8 !bg-orange-50/20">
-              <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 h-full">
+            <div className="flex-1 overflow-y-auto p-8 !bg-orange-50/20 min-h-0">
+              <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
                 {/* Left Column - Recipe Info (2 parts) */}
                 <div className="lg:col-span-2 flex flex-col gap-6">
                   <div className="bg-white p-6 rounded-2xl shadow-sm border-2 border-orange-100">
@@ -2056,8 +2040,7 @@ export function MenuManagement() {
                   </div>
 
                   <ScrollArea
-                    className="flex-1 pr-4"
-                    style={{ maxHeight: "calc(80vh - 280px)" }}
+                    className="flex-1 pr-4 min-h-0"
                   >
                     <div className="space-y-3">
                       {recipeFormData.ingredients.map((ing, index) => {
@@ -2222,7 +2205,7 @@ export function MenuManagement() {
             </div>
 
             {/* Footer */}
-            <div className="px-8 py-5 border-t-2 border-orange-200 bg-white flex justify-between items-center gap-4">
+            <div className="px-8 py-5 border-t-2 border-orange-200 bg-white flex justify-between items-center gap-4 flex-shrink-0">
               {error && (
                 <div className="flex-1 p-3 bg-red-50 border-2 border-red-200 rounded-xl text-red-600 text-sm font-medium">
                   {error}
