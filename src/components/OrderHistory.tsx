@@ -304,14 +304,17 @@ export function OrderHistory() {
       {/* Order Detail Dialog */}
       <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
         <DialogContent
-          className="mx-auto overflow-y-auto"
+          className="mx-auto p-0 overflow-hidden"
           style={{
             width: "min(700px, 90vw)",
             maxWidth: "700px",
+            height: "80vh",
             maxHeight: "80vh",
+            display: "flex",
+            flexDirection: "column",
           }}
         >
-          <DialogHeader>
+          <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0 border-b">
             <DialogTitle className="flex items-center gap-2">
               <Receipt className="h-5 w-5 text-orange-500" />
               Chi tiết đơn hàng
@@ -322,7 +325,8 @@ export function OrderHistory() {
           </DialogHeader>
 
           {selectedOrder && (
-            <div className="space-y-4 py-4">
+            <div className="flex-1 overflow-y-auto min-h-0 px-6 py-4">
+              <div className="space-y-4">
               {/* Order Info */}
               <Card className="p-4 bg-orange-50 border-orange-200">
                 <div className="grid grid-cols-2 gap-3 text-sm">
@@ -440,7 +444,7 @@ export function OrderHistory() {
                               <img
                                 src={payment.qrCode}
                                 alt="QR Code"
-                                className="w-48 h-48 border-2 border-green-300 rounded-lg"
+                                className="w-[138px] h-[138px] border-2 border-green-300 rounded-lg"
                               />
                             </div>
                           )}
@@ -552,6 +556,7 @@ export function OrderHistory() {
                   Hủy đơn hàng
                 </Button>
               )}
+              </div>
             </div>
           )}
         </DialogContent>

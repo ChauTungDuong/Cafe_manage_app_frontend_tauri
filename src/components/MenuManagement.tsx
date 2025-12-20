@@ -134,9 +134,11 @@ export function MenuManagement() {
     setError("");
     try {
       console.log("📦 Loading items...");
-      const data = await itemsApi.list();
-      console.log("✅ Items loaded:", data);
-      setItems(data);
+      const response = await itemsApi.list();
+      console.log("✅ Items loaded:", response);
+      // Handle both array and object with data property
+      const itemsData = Array.isArray(response) ? response : (response?.data || response || []);
+      setItems(itemsData);
     } catch (err: any) {
       const message =
         err.response?.data?.message || "Không thể tải danh sách sản phẩm";
@@ -156,9 +158,11 @@ export function MenuManagement() {
     setIsLoadingCategories(true);
     try {
       console.log("📂 Loading categories...");
-      const data = await categoriesApi.list();
-      console.log("✅ Categories loaded:", data);
-      setCategories(data);
+      const response = await categoriesApi.list();
+      console.log("✅ Categories loaded:", response);
+      // Handle both array and object with data property
+      const categoriesData = Array.isArray(response) ? response : (response?.data || response || []);
+      setCategories(categoriesData);
     } catch (err: any) {
       console.error("❌ Load categories error:", err);
       console.error("Error details:", {
@@ -177,9 +181,11 @@ export function MenuManagement() {
       console.log("🥬 Loading ingredients...");
       // Import ingredientsApi dynamically only when needed
       const { ingredientsApi } = await import("../lib/api");
-      const data = await ingredientsApi.list();
-      console.log("✅ Ingredients loaded:", data);
-      setIngredients(data);
+      const response = await ingredientsApi.list();
+      console.log("✅ Ingredients loaded:", response);
+      // Handle both array and object with data property
+      const ingredientsData = Array.isArray(response) ? response : (response?.data || response || []);
+      setIngredients(ingredientsData);
     } catch (err: any) {
       console.error("❌ Load ingredients error:", err);
     }
@@ -190,9 +196,11 @@ export function MenuManagement() {
     setIsLoadingAllRecipes(true);
     try {
       console.log("📋 Loading all recipes...");
-      const data = await recipesApi.list();
-      console.log("✅ All recipes loaded:", data);
-      setAllRecipes(data);
+      const response = await recipesApi.list();
+      console.log("✅ All recipes loaded:", response);
+      // Handle both array and object with data property
+      const recipesData = Array.isArray(response) ? response : (response?.data || response || []);
+      setAllRecipes(recipesData);
     } catch (err: any) {
       console.error("❌ Load all recipes error:", err);
     } finally {

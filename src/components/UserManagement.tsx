@@ -351,6 +351,24 @@ export function UserManagement() {
 
   return (
     <div className="space-y-6">
+      <style>{`
+        @media (min-width: 768px) {
+          .user-dialog-layout {
+            display: flex !important;
+            flex-direction: row !important;
+            flex-wrap: nowrap !important;
+          }
+          .user-dialog-form {
+            flex: 1 1 auto !important;
+            min-width: 0 !important;
+          }
+          .user-dialog-avatar {
+            flex: 0 0 300px !important;
+            width: 300px !important;
+            max-width: 300px !important;
+          }
+        }
+      `}</style>
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
@@ -382,9 +400,9 @@ export function UserManagement() {
             </DialogHeader>
 
             {/* 2-column layout */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4">
+            <div className="flex flex-col md:flex-row gap-6 py-4 user-dialog-layout">
               {/* Left Column - Form Fields */}
-              <div className="space-y-4">
+              <div className="flex-1 space-y-4">
                 {/* Name */}
                 <div className="space-y-2">
                   <Label htmlFor="name">Họ và tên *</Label>
@@ -412,50 +430,75 @@ export function UserManagement() {
                   />
                 </div>
 
-                {/* Gender */}
-                <div className="space-y-2">
-                  <Label>Giới tính *</Label>
-                  <Select
-                    value={formData.gender}
-                    onValueChange={(value: "male" | "female") =>
-                      setFormData({ ...formData, gender: value })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="male">👨 Nam</SelectItem>
-                      <SelectItem value="female">👩 Nữ</SelectItem>
-                    </SelectContent>
-                  </Select>
+                {/* Gender and Birthday - Same Row */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Gender */}
+                  <div className="space-y-2">
+                    <Label>Giới tính *</Label>
+                    <Select
+                      value={formData.gender}
+                      onValueChange={(value: "male" | "female") =>
+                        setFormData({ ...formData, gender: value })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="male">👨 Nam</SelectItem>
+                        <SelectItem value="female">👩 Nữ</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Birthday */}
+                  <div className="space-y-2">
+                    <Label htmlFor="birthday">Ngày sinh</Label>
+                    <Input
+                      id="birthday"
+                      type="date"
+                      value={formData.birthday}
+                      onChange={(e) =>
+                        setFormData({ ...formData, birthday: e.target.value })
+                      }
+                    />
+                  </div>
                 </div>
 
-                {/* Birthday */}
-                <div className="space-y-2">
-                  <Label htmlFor="birthday">Ngày sinh</Label>
-                  <Input
-                    id="birthday"
-                    type="date"
-                    value={formData.birthday}
-                    onChange={(e) =>
-                      setFormData({ ...formData, birthday: e.target.value })
-                    }
-                  />
-                </div>
+                {/* Phone and Role - Same Row */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Phone */}
+                  <div className="space-y-2">
+                    <Label htmlFor="phone">Số điện thoại</Label>
+                    <Input
+                      id="phone"
+                      type="tel"
+                      value={formData.phone}
+                      onChange={(e) =>
+                        setFormData({ ...formData, phone: e.target.value })
+                      }
+                      placeholder="0912345678"
+                    />
+                  </div>
 
-                {/* Phone */}
-                <div className="space-y-2">
-                  <Label htmlFor="phone">Số điện thoại</Label>
-                  <Input
-                    id="phone"
-                    type="tel"
-                    value={formData.phone}
-                    onChange={(e) =>
-                      setFormData({ ...formData, phone: e.target.value })
-                    }
-                    placeholder="0912345678"
-                  />
+                  {/* Role */}
+                  <div className="space-y-2">
+                    <Label>Vai trò *</Label>
+                    <Select
+                      value={formData.role}
+                      onValueChange={(value: "admin" | "staff") =>
+                        setFormData({ ...formData, role: value })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="admin">👑 Quản trị viên</SelectItem>
+                        <SelectItem value="staff">👤 Nhân viên</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
 
                 {/* Address */}
@@ -513,13 +556,13 @@ export function UserManagement() {
               </div>
 
               {/* Right Column - Avatar & Role */}
-              <div className="space-y-4">
+              <div className="w-full md:w-[300px] md:flex-shrink-0 space-y-4 user-dialog-avatar">
                 {/* Avatar Upload */}
                 <div className="space-y-2">
                   <Label>Ảnh đại diện</Label>
 
                   {/* Avatar Preview */}
-                  <div className="relative aspect-square w-full max-w-[180px] mx-auto rounded-full overflow-hidden border-2 border-orange-200 bg-gray-50">
+                  <div className="relative w-24 h-24 mx-auto rounded-full overflow-hidden border-2 border-orange-200 bg-gray-50">
                     <img
                       src={
                         avatarPreview ||
@@ -568,25 +611,6 @@ export function UserManagement() {
                       JPG, PNG (tối đa 5MB)
                     </p>
                   </div>
-                </div>
-
-                {/* Role */}
-                <div className="space-y-2">
-                  <Label>Vai trò *</Label>
-                  <Select
-                    value={formData.role}
-                    onValueChange={(value: "admin" | "staff") =>
-                      setFormData({ ...formData, role: value })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="admin">👑 Quản trị viên</SelectItem>
-                      <SelectItem value="staff">👤 Nhân viên</SelectItem>
-                    </SelectContent>
-                  </Select>
                 </div>
 
                 {/* Is Active */}
