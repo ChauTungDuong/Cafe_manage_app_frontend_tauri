@@ -137,7 +137,9 @@ export function MenuManagement() {
       const response = await itemsApi.list();
       console.log("✅ Items loaded:", response);
       // Handle both array and object with data property
-      const itemsData = Array.isArray(response) ? response : (response?.data || response || []);
+      const itemsData = Array.isArray(response)
+        ? response
+        : response?.data || response || [];
       setItems(itemsData);
     } catch (err: any) {
       const message =
@@ -161,7 +163,9 @@ export function MenuManagement() {
       const response = await categoriesApi.list();
       console.log("✅ Categories loaded:", response);
       // Handle both array and object with data property
-      const categoriesData = Array.isArray(response) ? response : (response?.data || response || []);
+      const categoriesData = Array.isArray(response)
+        ? response
+        : response?.data || response || [];
       setCategories(categoriesData);
     } catch (err: any) {
       console.error("❌ Load categories error:", err);
@@ -184,7 +188,9 @@ export function MenuManagement() {
       const response = await ingredientsApi.list();
       console.log("✅ Ingredients loaded:", response);
       // Handle both array and object with data property
-      const ingredientsData = Array.isArray(response) ? response : (response?.data || response || []);
+      const ingredientsData = Array.isArray(response)
+        ? response
+        : response?.data || response || [];
       setIngredients(ingredientsData);
     } catch (err: any) {
       console.error("❌ Load ingredients error:", err);
@@ -199,7 +205,9 @@ export function MenuManagement() {
       const response = await recipesApi.list();
       console.log("✅ All recipes loaded:", response);
       // Handle both array and object with data property
-      const recipesData = Array.isArray(response) ? response : (response?.data || response || []);
+      const recipesData = Array.isArray(response)
+        ? response
+        : response?.data || response || [];
       setAllRecipes(recipesData);
     } catch (err: any) {
       console.error("❌ Load all recipes error:", err);
@@ -777,7 +785,16 @@ export function MenuManagement() {
             value="products"
             className="mt-0 bg-white p-6 border-2 border-t-0 border-orange-200 rounded-b-lg space-y-6"
           >
-            <div className="flex justify-end">
+            {/* Header with Add Button */}
+            <div className="flex justify-between items-center">
+              <div>
+                <h3 className="text-lg font-semibold text-amber-900">
+                  Quản lý sản phẩm ({items.length})
+                </h3>
+                <p className="text-sm text-amber-700/70">
+                  Tạo và quản lý các sản phẩm trong menu
+                </p>
+              </div>
               <Button
                 onClick={() => handleOpenDialog()}
                 className="bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white"
@@ -1199,7 +1216,15 @@ export function MenuManagement() {
             className="mt-0 bg-white p-6 border-2 border-t-0 border-orange-200 rounded-b-lg space-y-6"
           >
             {/* Header with Add Button */}
-            <div className="flex justify-end">
+            <div className="flex justify-between items-center">
+              <div>
+                <h3 className="text-lg font-semibold text-amber-900">
+                  Quản lý danh mục ({categories.length})
+                </h3>
+                <p className="text-sm text-amber-700/70">
+                  Tạo và quản lý các danh mục sản phẩm
+                </p>
+              </div>
               <Button
                 onClick={() => handleOpenCategoryDialog()}
                 className="bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white"
@@ -1809,7 +1834,16 @@ export function MenuManagement() {
                     Món này chưa có công thức
                   </p>
                   <Button
-                    onClick={() => handleOpenRecipeForm()}
+                    onClick={() => {
+                      setRecipeTabFormData({
+                        name: "",
+                        description: "",
+                        itemId: selectedItemForRecipe?.id || "",
+                        ingredients: [],
+                      });
+                      loadIngredients();
+                      setIsRecipeTabFormOpen(true);
+                    }}
                     className="bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white"
                   >
                     <Plus className="h-4 w-4 mr-2" />
@@ -1838,7 +1872,25 @@ export function MenuManagement() {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => handleOpenRecipeForm(recipe)}
+                            onClick={async () => {
+                              setEditingRecipeInTab(recipe);
+                              setRecipeTabFormData({
+                                name: recipe.name,
+                                description: recipe.description || "",
+                                itemId:
+                                  recipe.item?.id ||
+                                  selectedItemForRecipe?.id ||
+                                  "",
+                                ingredients: recipe.recipeIngredients.map(
+                                  (ri) => ({
+                                    ingredientId: ri.ingredient.id,
+                                    amount: ri.amount,
+                                  })
+                                ),
+                              });
+                              await loadIngredients();
+                              setIsRecipeTabFormOpen(true);
+                            }}
                             className="border-orange-200 hover:bg-orange-50"
                           >
                             <Edit className="h-4 w-4" />
@@ -1887,7 +1939,16 @@ export function MenuManagement() {
             <div className="flex gap-3 pt-4 border-t">
               {recipes.length > 0 && (
                 <Button
-                  onClick={() => handleOpenRecipeForm()}
+                  onClick={() => {
+                    setRecipeTabFormData({
+                      name: "",
+                      description: "",
+                      itemId: selectedItemForRecipe?.id || "",
+                      ingredients: [],
+                    });
+                    loadIngredients();
+                    setIsRecipeTabFormOpen(true);
+                  }}
                   className="bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white"
                 >
                   <Plus className="h-4 w-4 mr-2" />
