@@ -249,64 +249,63 @@ export function TaxManagement() {
                 />
               </div>
 
-              {/* Type Toggle */}
-              <div className="space-y-2">
-                <Label>Loại *</Label>
-                <div className="flex items-center gap-4 p-3 border-2 border-orange-200 rounded-lg bg-orange-50/30">
-                  <span
-                    className={`text-sm font-medium ${
-                      formData.type === "discount"
-                        ? "text-gray-400"
-                        : "text-orange-600"
-                    }`}
-                  >
-                    Thuế
-                  </span>
-                  <Switch
-                    checked={formData.type === "discount"}
-                    onCheckedChange={(checked) =>
-                      setFormData({
-                        ...formData,
-                        type: checked ? "discount" : "tax",
-                      })
-                    }
-                  />
-                  <span
-                    className={`text-sm font-medium ${
-                      formData.type === "tax"
-                        ? "text-gray-400"
-                        : "text-green-600"
-                    }`}
-                  >
-                    Giảm giá
-                  </span>
+              {/* Type and Percent - Same Row */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Type Toggle */}
+                <div className="space-y-2">
+                  <Label>Loại *</Label>
+                  <div className="flex items-center gap-4 p-3 border-2 border-orange-200 rounded-lg bg-orange-50/30">
+                    <span
+                      className={`text-sm font-medium ${
+                        formData.type === "discount"
+                          ? "text-gray-400"
+                          : "text-orange-600"
+                      }`}
+                    >
+                      Thuế
+                    </span>
+                    <Switch
+                      checked={formData.type === "discount"}
+                      onCheckedChange={(checked) =>
+                        setFormData({
+                          ...formData,
+                          type: checked ? "discount" : "tax",
+                        })
+                      }
+                    />
+                    <span
+                      className={`text-sm font-medium ${
+                        formData.type === "tax"
+                          ? "text-gray-400"
+                          : "text-green-600"
+                      }`}
+                    >
+                      Giảm giá
+                    </span>
+                  </div>
                 </div>
-              </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="percent">Phần trăm (%) *</Label>
-                <Input
-                  id="percent"
-                  type="number"
-                  step="0.01"
-                  min="0.01"
-                  max="100"
-                  value={Math.abs(formData.percent)}
-                  onChange={(e) => {
-                    const value = parseFloat(e.target.value);
-                    if (!isNaN(value) && value >= 0) {
-                      setFormData({
-                        ...formData,
-                        percent: value,
-                      });
-                    }
-                  }}
-                  placeholder="Nhập giá trị phần trăm (0.01 - 100)"
-                />
-                <p className="text-xs text-amber-600">
-                  Ví dụ: 10 ={" "}
-                  {formData.type === "tax" ? "+10% (thuế)" : "-10% (giảm giá)"}
-                </p>
+                <div className="space-y-2">
+                  <Label htmlFor="percent">Phần trăm (%) *</Label>
+                  <Input
+                    id="percent"
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    max="100"
+                    value={Math.abs(formData.percent)}
+                    onChange={(e) => {
+                      const value = parseFloat(e.target.value);
+                      if (!isNaN(value) && value >= 0) {
+                        setFormData({
+                          ...formData,
+                          percent: value,
+                        });
+                      }
+                    }}
+                    placeholder="Nhập giá trị phần trăm (0.01 - 100)"
+                  />
+                </div>
               </div>
 
               <div className="space-y-2">
@@ -338,30 +337,33 @@ export function TaxManagement() {
                 </div>
               </div>
 
-              {/* Apply From */}
-              <div className="space-y-2">
-                <Label htmlFor="applyFrom">Áp dụng từ ngày (tùy chọn)</Label>
-                <Input
-                  id="applyFrom"
-                  type="date"
-                  value={formData.applyFrom}
-                  onChange={(e) =>
-                    setFormData({ ...formData, applyFrom: e.target.value })
-                  }
-                />
-              </div>
+              {/* Apply From and To - Same Row */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Apply From */}
+                <div className="space-y-2">
+                  <Label htmlFor="applyFrom">Áp dụng từ ngày (tùy chọn)</Label>
+                  <Input
+                    id="applyFrom"
+                    type="date"
+                    value={formData.applyFrom}
+                    onChange={(e) =>
+                      setFormData({ ...formData, applyFrom: e.target.value })
+                    }
+                  />
+                </div>
 
-              {/* Apply To */}
-              <div className="space-y-2">
-                <Label htmlFor="applyTo">Áp dụng đến ngày (tùy chọn)</Label>
-                <Input
-                  id="applyTo"
-                  type="date"
-                  value={formData.applyTo}
-                  onChange={(e) =>
-                    setFormData({ ...formData, applyTo: e.target.value })
-                  }
-                />
+                {/* Apply To */}
+                <div className="space-y-2">
+                  <Label htmlFor="applyTo">Áp dụng đến ngày (tùy chọn)</Label>
+                  <Input
+                    id="applyTo"
+                    type="date"
+                    value={formData.applyTo}
+                    onChange={(e) =>
+                      setFormData({ ...formData, applyTo: e.target.value })
+                    }
+                  />
+                </div>
               </div>
             </div>
 

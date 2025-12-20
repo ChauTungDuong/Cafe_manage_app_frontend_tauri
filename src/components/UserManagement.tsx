@@ -652,22 +652,22 @@ export function UserManagement() {
       )}
 
       {/* Statistics */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="p-4 border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-blue-100 shadow-lg hover:shadow-xl transition-shadow">
+      <div className="flex flex-row gap-4">
+        <Card className="flex-1 p-4 border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-blue-100 shadow-lg hover:shadow-xl transition-shadow">
           <p className="text-sm text-blue-700 mb-1">Tổng số</p>
           <p className="text-2xl font-bold text-blue-800">{totalUsers}</p>
         </Card>
-        <Card className="p-4 border-2 border-purple-200 bg-gradient-to-br from-purple-50 to-purple-100 shadow-lg hover:shadow-xl transition-shadow">
+        <Card className="flex-1 p-4 border-2 border-emerald-200 bg-gradient-to-br from-emerald-50 to-emerald-100 shadow-lg hover:shadow-xl transition-shadow">
+          <p className="text-sm text-emerald-700 mb-1">Hoạt động</p>
+          <p className="text-2xl font-bold text-emerald-800">{activeCount}</p>
+        </Card>
+        <Card className="flex-1 p-4 border-2 border-purple-200 bg-gradient-to-br from-purple-50 to-purple-100 shadow-lg hover:shadow-xl transition-shadow">
           <p className="text-sm text-purple-700 mb-1">Quản trị viên</p>
           <p className="text-2xl font-bold text-purple-800">{adminCount}</p>
         </Card>
-        <Card className="p-4 border-2 border-amber-200 bg-gradient-to-br from-amber-50 to-amber-100 shadow-lg hover:shadow-xl transition-shadow">
+        <Card className="flex-1 p-4 border-2 border-amber-200 bg-gradient-to-br from-amber-50 to-amber-100 shadow-lg hover:shadow-xl transition-shadow">
           <p className="text-sm text-amber-700 mb-1">Nhân viên</p>
           <p className="text-2xl font-bold text-amber-800">{staffCount}</p>
-        </Card>
-        <Card className="p-4 border-2 border-emerald-200 bg-gradient-to-br from-emerald-50 to-emerald-100 shadow-lg hover:shadow-xl transition-shadow">
-          <p className="text-sm text-emerald-700 mb-1">Hoạt động</p>
-          <p className="text-2xl font-bold text-emerald-800">{activeCount}</p>
         </Card>
       </div>
 
