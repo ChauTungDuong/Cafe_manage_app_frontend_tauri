@@ -8,8 +8,14 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "./ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
 import {
   BarChart,
   Bar,
@@ -30,6 +36,7 @@ import {
   Calendar,
   FileText,
   Loader2,
+  ChevronDown,
 } from "lucide-react";
 import { statisticsApi } from "../lib/api";
 import { Statistic } from "../types/api";
@@ -318,100 +325,123 @@ export function RevenueDashboard() {
             <Calendar className="h-4 w-4 mr-2" />
             Theo tháng
           </Button>
-          <Button
-            onClick={handleGenerateLastMonth}
-            disabled={generating}
-            className="h-11 px-6 rounded-xl bg-gradient-to-r from-green-500 to-emerald-600 text-white"
-          >
-            {generating ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <FileText className="h-4 w-4 mr-2" />
-            )}
-            Tạo 30 ngày
-          </Button>
-          <Dialog
-            open={showGenerateDialog}
-            onOpenChange={setShowGenerateDialog}
-          >
-            <DialogTrigger asChild>
-              <Button className="h-11 px-6 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 text-white">
+          {/* Reports Dropdown Menu */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button className="h-11 px-6 rounded-xl bg-gradient-to-r from-orange-500 to-amber-600 text-white hover:from-orange-600 hover:to-amber-700">
                 <FileText className="h-4 w-4 mr-2" />
-                Tạo báo cáo
+                Báo cáo
+                <ChevronDown className="h-4 w-4 ml-2" />
               </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-md">
-              <DialogHeader>
-                <DialogTitle className="text-amber-900">
-                  Tạo báo cáo theo khoảng thời gian
-                </DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="generateStartDate" className="text-amber-900">
-                    Ngày bắt đầu
-                  </Label>
-                  <Input
-                    id="generateStartDate"
-                    type="date"
-                    value={generateStartDate}
-                    onChange={(e) => setGenerateStartDate(e.target.value)}
-                    className="mt-1 border-orange-200 rounded-xl"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="generateEndDate" className="text-amber-900">
-                    Ngày kết thúc
-                  </Label>
-                  <Input
-                    id="generateEndDate"
-                    type="date"
-                    value={generateEndDate}
-                    onChange={(e) => setGenerateEndDate(e.target.value)}
-                    className="mt-1 border-orange-200 rounded-xl"
-                  />
-                </div>
-                <Button
-                  onClick={handleGenerateRange}
-                  disabled={generating}
-                  className="w-full h-11 bg-gradient-to-r from-orange-500 to-amber-600 text-white rounded-xl"
-                >
-                  {generating ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Đang tạo...
-                    </>
-                  ) : (
-                    <>
-                      <FileText className="h-4 w-4 mr-2" />
-                      Tạo báo cáo
-                    </>
-                  )}
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56 rounded-xl border-2 border-orange-100">
+              <DropdownMenuItem
+                onClick={handleGenerateLastMonth}
+                disabled={generating}
+                className="cursor-pointer focus:bg-orange-50 hover:bg-orange-50 transition-colors"
+              >
+                {generating ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <FileText className="h-4 w-4 mr-2" />
+                )}
+                <span>Tạo 30 ngày gần nhất</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => setShowGenerateDialog(true)}
+                className="cursor-pointer focus:bg-orange-50 hover:bg-orange-50 transition-colors"
+              >
+                <FileText className="h-4 w-4 mr-2" />
+                <span>Tạo báo cáo tùy chỉnh</span>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator className="bg-orange-100" />
+              <DropdownMenuItem
+                onClick={() => setShowReportsList(true)}
+                className="cursor-pointer focus:bg-orange-50 hover:bg-orange-50 transition-colors"
+              >
+                <FileText className="h-4 w-4 mr-2" />
+                <span>Xem danh sách báo cáo</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          {/* Refresh Button */}
           <Button
             onClick={loadStatistics}
-            className="h-11 px-6 rounded-xl bg-white text-amber-900 border-2 border-orange-200"
+            className="h-11 px-6 rounded-xl bg-white text-amber-900 border-2 border-orange-200 hover:bg-orange-50"
           >
             <RefreshCw className="h-4 w-4 mr-2" />
             Làm mới
           </Button>
-          <Dialog open={showReportsList} onOpenChange={setShowReportsList}>
-            <DialogTrigger asChild>
-              <Button className="h-11 px-6 rounded-xl bg-gradient-to-r from-purple-500 to-violet-600 text-white">
-                <FileText className="h-4 w-4 mr-2" />
-                Xem báo cáo
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle className="text-amber-900">
-                  Danh sách báo cáo đã tạo
-                </DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4">
+        </div>
+      </div>
+
+      {/* Generate Custom Report Dialog */}
+      <Dialog
+        open={showGenerateDialog}
+        onOpenChange={setShowGenerateDialog}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-amber-900">
+              Tạo báo cáo theo khoảng thời gian
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="generateStartDate" className="text-amber-900">
+                Ngày bắt đầu
+              </Label>
+              <Input
+                id="generateStartDate"
+                type="date"
+                value={generateStartDate}
+                onChange={(e) => setGenerateStartDate(e.target.value)}
+                className="mt-1 border-orange-200 rounded-xl"
+              />
+            </div>
+            <div>
+              <Label htmlFor="generateEndDate" className="text-amber-900">
+                Ngày kết thúc
+              </Label>
+              <Input
+                id="generateEndDate"
+                type="date"
+                value={generateEndDate}
+                onChange={(e) => setGenerateEndDate(e.target.value)}
+                className="mt-1 border-orange-200 rounded-xl"
+              />
+            </div>
+            <Button
+              onClick={handleGenerateRange}
+              disabled={generating}
+              className="w-full h-11 bg-gradient-to-r from-orange-500 to-amber-600 text-white rounded-xl"
+            >
+              {generating ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Đang tạo...
+                </>
+              ) : (
+                <>
+                  <FileText className="h-4 w-4 mr-2" />
+                  Tạo báo cáo
+                </>
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* View Reports Dialog */}
+      <Dialog open={showReportsList} onOpenChange={setShowReportsList}>
+        <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-amber-900">
+              Danh sách báo cáo đã tạo
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
                 {statistics.length === 0 ? (
                   <div className="text-center py-12">
                     <FileText className="h-12 w-12 text-amber-600/30 mx-auto mb-3" />
@@ -521,11 +551,9 @@ export function RevenueDashboard() {
                     </div>
                   </>
                 )}
-              </div>
-            </DialogContent>
-          </Dialog>
-        </div>
-      </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Date Filter */}
       <Card className="p-4 rounded-2xl border-2 border-orange-100">
