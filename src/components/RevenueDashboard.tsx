@@ -435,16 +435,26 @@ export function RevenueDashboard() {
 
       {/* View Reports Dialog */}
       <Dialog open={showReportsList} onOpenChange={setShowReportsList}>
-        <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
+          <DialogContent 
+          className="!w-[95vw] !max-w-[1400px] !h-[90vh] !max-h-[90vh] p-0 overflow-hidden"
+          style={{ 
+            display: 'flex', 
+            flexDirection: 'column',
+            width: '95vw',
+            maxWidth: '1400px',
+            height: '90vh',
+            maxHeight: '90vh'
+          }}
+        >
+          <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0 border-b">
             <DialogTitle className="text-amber-900">
               Danh sách báo cáo đã tạo
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
+          <div className="flex-1 overflow-y-auto min-h-0 px-6 py-4">
                 {statistics.length === 0 ? (
-                  <div className="text-center py-12">
-                    <FileText className="h-12 w-12 text-amber-600/30 mx-auto mb-3" />
+                  <div className="flex flex-col items-center justify-center h-full text-center py-12">
+                    <FileText className="h-12 w-12 text-amber-600/30 mb-3" />
                     <p className="text-amber-600">Chưa có báo cáo nào</p>
                     <p className="text-amber-700/70 text-sm mt-2">
                       Sử dụng các nút "Tạo 30 ngày" hoặc "Tạo báo cáo" để tạo
