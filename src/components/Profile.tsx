@@ -18,7 +18,6 @@ import {
   Save,
   X,
   Loader2,
-  Upload,
   Camera,
 } from "lucide-react";
 import { User as UserType } from "../types/user";

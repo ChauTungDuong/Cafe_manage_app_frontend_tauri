@@ -147,11 +147,14 @@ export function Login({ onLogin }: LoginProps) {
       console.log("✅ Login successful:", response.user);
       onLogin(response.user.role, response.user);
     } catch (err: any) {
-      // Clear timer ngay khi có lỗi
+      // Clear timer NGAY LẬP TỨC khi có lỗi - trước khi xử lý bất kỳ logic nào
       if (coldStartTimer) {
         clearTimeout(coldStartTimer);
         coldStartTimer = null;
       }
+      // Reset loading state ngay để tránh hiển thị cold start message
+      setIsLoading(false);
+      setLoadingMessage("");
 
       console.error("❌ Login error:", err);
       console.error("Error details:", {
@@ -171,22 +174,17 @@ export function Login({ onLogin }: LoginProps) {
           err.response?.data?.message ||
             "Email hoặc mật khẩu không đúng. Vui lòng thử lại!"
         );
-        // Reset loading state ngay lập tức cho lỗi 401
-        setIsLoading(false);
-        setLoadingMessage("");
       }
       // Xử lý lỗi server/cold start (503, 500, 502, 504)
       else if (statusCode === 503 || statusCode === 502 || statusCode === 504) {
         setError(
           "Server đang khởi động (cold start). Vui lòng đợi 30-60 giây và thử lại."
         );
-        // Reset loading state
-        setIsLoading(false);
-        setLoadingMessage("");
       }
       // Xử lý lỗi timeout với retry tự động
       else if (err.code === "ECONNABORTED" && retryCount < 2) {
         shouldRetry = true;
+        setIsLoading(true);
         setLoadingMessage(`Timeout. Đang thử lại lần ${retryCount + 2}/3...`);
         console.log(`🔄 Retrying login (${retryCount + 1}/2)...`);
 
@@ -200,26 +198,14 @@ export function Login({ onLogin }: LoginProps) {
         setError(
           "Không thể kết nối đến server sau 3 lần thử. Server có thể đang khởi động (cold start). Vui lòng thử lại sau 30 giây."
         );
-        // Reset loading state
-        setIsLoading(false);
-        setLoadingMessage("");
       }
       // Xử lý các lỗi khác
       else if (err.response?.data?.message) {
         setError(err.response.data.message);
-        // Reset loading state
-        setIsLoading(false);
-        setLoadingMessage("");
       } else if (err.message) {
         setError(err.message);
-        // Reset loading state
-        setIsLoading(false);
-        setLoadingMessage("");
       } else {
         setError("Đăng nhập thất bại. Vui lòng thử lại!");
-        // Reset loading state
-        setIsLoading(false);
-        setLoadingMessage("");
       }
     } finally {
       // Cleanup timer nếu còn tồn tại
@@ -228,8 +214,8 @@ export function Login({ onLogin }: LoginProps) {
         coldStartTimer = null;
       }
 
-      // Chỉ reset loading state nếu không retry và chưa reset trong catch
-      if (!shouldRetry && isLoading) {
+      // Chỉ set loading = true nếu đang retry, không cần reset vì đã reset ở catch
+      if (!shouldRetry) {
         setIsLoading(false);
         setLoadingMessage("");
       }

@@ -34,6 +34,7 @@ export interface Item {
   image?: string;
   imagePublicId?: string;
   status: "available" | "out of stock" | "discontinued";
+  amountLeft?: number;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -231,38 +232,41 @@ export interface TopProduct {
   totalRevenue: number;
 }
 
+export interface DailyBreakdown {
+  date: string; // "2024-12-16" (YYYY-MM-DD)
+  dayOfWeek: number; // 0=Chủ nhật, 1=Thứ hai, ..., 6=Thứ bảy
+  dayName: string; // "Thứ hai", "Thứ ba", etc.
+  revenue: number; // Doanh thu ngày đó
+  orders: number; // Số đơn hàng
+  productsSold: number; // Số sản phẩm bán ra
+}
+
 export interface Statistic {
   id: string;
   date: string;
-  period: "daily" | "monthly";
+  period: "daily" | "weekly" | "monthly" | "custom";
+  startDate?: string;
+  endDate?: string;
   totalRevenue: number;
   totalOrders: number;
   averageOrderValue: number;
   totalProductsSold: number;
   topProducts: TopProduct[];
+  dailyBreakdown?: DailyBreakdown[]; // Available for weekly/monthly reports only
   createdAt: string;
   updatedAt: string;
 }
 
-export interface GenerateStatsResponse {
+export interface CreateReportResponse {
   success: boolean;
   message: string;
-  processed: number;
-  failed: number;
-  startDate: string;
-  endDate: string;
+  data: Statistic;
 }
 
-export interface GenerateRangeResponse {
-  success: boolean;
-  message: string;
-  dailyStats: {
-    processed: number;
-    failed: number;
-  };
-  monthlyStats: {
-    processed: number;
-  };
-  startDate: string;
-  endDate: string;
+export type ReportType = "weekly" | "monthly" | "custom";
+
+export interface CreateReportRequest {
+  reportType: ReportType;
+  startDate?: string;
+  endDate?: string;
 }

@@ -191,8 +191,16 @@ export function OrderHistory({ currentUser }: OrderHistoryProps) {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-amber-900 mb-1">Lịch sử đơn hàng</h2>
-          <p className="text-amber-700/70">Xem và quản lý đơn hàng</p>
+          <h2 className="text-amber-900 mb-1">
+            {currentUser?.role === "admin"
+              ? `Quản lý hóa đơn (${orders.length})`
+              : `Hóa đơn (${orders.length})`}
+          </h2>
+          <p className="text-amber-700/70">
+            {currentUser?.role === "admin"
+              ? "Quản lý các hóa đơn"
+              : "Xem các hóa đơn đã tạo"}
+          </p>
         </div>
       </div>
 
@@ -409,6 +417,19 @@ export function OrderHistory({ currentUser }: OrderHistoryProps) {
                       </p>
                     </div>
                     <div>
+                      <span className="text-amber-600">
+                        Phương thức thanh toán:
+                      </span>
+                      <p className="font-semibold text-amber-900">
+                        {selectedOrder.payments &&
+                        selectedOrder.payments.length > 0
+                          ? selectedOrder.payments
+                              .map((p) => getPaymentMethodLabel(p.method))
+                              .join(", ")
+                          : "Chưa thanh toán"}
+                      </p>
+                    </div>
+                    <div>
                       <span className="text-amber-600">Thuế & Giảm giá:</span>
                       <div className="space-y-1 mt-1">
                         {selectedOrder.taxesAndDiscounts.length > 0 ? (
@@ -418,7 +439,7 @@ export function OrderHistory({ currentUser }: OrderHistoryProps) {
                               className="font-semibold text-amber-900"
                             >
                               {td.name} ({td.type === "tax" ? "+" : "-"}
-                              {parseFloat(td.percent)}%)
+                              {td.percent}%)
                             </p>
                           ))
                         ) : (
@@ -497,7 +518,7 @@ export function OrderHistory({ currentUser }: OrderHistoryProps) {
                                   <img
                                     src={payment.qrCode}
                                     alt="QR Code"
-                                    className="w-[138px] h-[138px] border-2 border-green-300 rounded-lg"
+                                    className="w-[180px] h-[180px] border-2 border-green-300 rounded-lg"
                                   />
                                 </div>
                               )}
@@ -535,14 +556,14 @@ export function OrderHistory({ currentUser }: OrderHistoryProps) {
                           0
                         );
                         const taxAmount =
-                          (subtotal * parseFloat(tax.percent)) / 100;
+                          (subtotal * Number(tax.percent)) / 100;
                         return (
                           <div
                             key={tax.id}
                             className="flex justify-between text-sm"
                           >
                             <span className="text-amber-700">
-                              {tax.name} (+{parseFloat(tax.percent)}%):
+                              {tax.name} (+{tax.percent}%):
                             </span>
                             <span className="text-amber-900 font-medium">
                               +{taxAmount.toLocaleString("vi-VN")}đ
@@ -564,21 +585,19 @@ export function OrderHistory({ currentUser }: OrderHistoryProps) {
                           .filter((td) => td.type === "tax")
                           .reduce(
                             (sum, tax) =>
-                              sum + (subtotal * parseFloat(tax.percent)) / 100,
+                              sum + (subtotal * Number(tax.percent)) / 100,
                             0
                           );
                         const subtotalWithTax = subtotal + totalTaxAmount;
                         const discountAmount =
-                          (subtotalWithTax * parseFloat(discount.percent)) /
-                          100;
+                          (subtotalWithTax * Number(discount.percent)) / 100;
                         return (
                           <div
                             key={discount.id}
                             className="flex justify-between text-sm"
                           >
                             <span className="text-amber-700">
-                              {discount.name} (-{parseFloat(discount.percent)}
-                              %):
+                              {discount.name} (-{discount.percent}%):
                             </span>
                             <span className="text-green-600 font-medium">
                               -{discountAmount.toLocaleString("vi-VN")}đ

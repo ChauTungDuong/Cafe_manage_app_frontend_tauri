@@ -3,12 +3,7 @@ import { Card } from "./ui/card";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "./ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -59,7 +54,7 @@ const COLORS = [
 ];
 
 export function RevenueDashboard() {
-  const [period, setPeriod] = useState<"daily" | "monthly">("daily");
+  const [period, setPeriod] = useState<"weekly" | "monthly">("weekly");
   const [statistics, setStatistics] = useState<Statistic[]>([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
@@ -104,25 +99,55 @@ export function RevenueDashboard() {
     loadStatistics();
   }, [period, filterStartDate, filterEndDate]);
 
-  // Generate last 30 days statistics
-  const handleGenerateLastMonth = async () => {
+  // Generate monthly report (last 30 days)
+  const handleGenerateMonthly = async () => {
     try {
       setGenerating(true);
       setError("");
-      const result = await statisticsApi.generateLastMonth();
+      const result = await statisticsApi.createReport("monthly");
       alert(
-        `Đã tạo thống kê cho ${result.processed} ngày thành công!\nTừ ${result.startDate} đến ${result.endDate}`
+        `Đã tạo báo cáo tháng thành công!\nTừ ${result.data.startDate} đến ${
+          result.data.endDate
+        }\nDoanh thu: ${result.data.totalRevenue.toLocaleString("vi-VN")}đ`
       );
       await loadStatistics();
     } catch (err: any) {
-      setError(err.response?.data?.message || "Không thể tạo báo cáo");
-      console.error("Error generating statistics:", err);
+      if (err.response?.status === 409) {
+        alert("Báo cáo tháng cho khoảng thời gian này đã tồn tại!");
+      } else {
+        setError(err.response?.data?.message || "Không thể tạo báo cáo");
+      }
+      console.error("Error generating monthly report:", err);
     } finally {
       setGenerating(false);
     }
   };
 
-  // Generate custom date range statistics
+  // Generate weekly report (last 7 days)
+  const handleGenerateWeekly = async () => {
+    try {
+      setGenerating(true);
+      setError("");
+      const result = await statisticsApi.createReport("weekly");
+      alert(
+        `Đã tạo báo cáo tuần thành công!\nTừ ${result.data.startDate} đến ${
+          result.data.endDate
+        }\nDoanh thu: ${result.data.totalRevenue.toLocaleString("vi-VN")}đ`
+      );
+      await loadStatistics();
+    } catch (err: any) {
+      if (err.response?.status === 409) {
+        alert("Báo cáo tuần cho khoảng thời gian này đã tồn tại!");
+      } else {
+        setError(err.response?.data?.message || "Không thể tạo báo cáo");
+      }
+      console.error("Error generating weekly report:", err);
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  // Generate custom date range report
   const handleGenerateRange = async () => {
     if (!generateStartDate || !generateEndDate) {
       alert("Vui lòng chọn khoảng thời gian!");
@@ -132,21 +157,26 @@ export function RevenueDashboard() {
     try {
       setGenerating(true);
       setError("");
-      const result = await statisticsApi.generateRange(
+      const result = await statisticsApi.createReport(
+        "custom",
         generateStartDate,
         generateEndDate
       );
       alert(
-        `Đã tạo thống kê thành công!\n` +
-          `Daily: ${result.dailyStats.processed} ngày\n` +
-          `Monthly: ${result.monthlyStats.processed} tháng\n` +
-          `Từ ${result.startDate} đến ${result.endDate}`
+        `Đã tạo báo cáo tùy chỉnh thành công!\n` +
+          `Từ ${result.data.startDate} đến ${result.data.endDate}\n` +
+          `Doanh thu: ${result.data.totalRevenue.toLocaleString("vi-VN")}đ\n` +
+          `Số đơn: ${result.data.totalOrders}`
       );
       setShowGenerateDialog(false);
       await loadStatistics();
     } catch (err: any) {
-      setError(err.response?.data?.message || "Không thể tạo báo cáo");
-      console.error("Error generating statistics:", err);
+      if (err.response?.status === 409) {
+        alert("Báo cáo cho khoảng thời gian này đã tồn tại!");
+      } else {
+        setError(err.response?.data?.message || "Không thể tạo báo cáo");
+      }
+      console.error("Error generating custom report:", err);
     } finally {
       setGenerating(false);
     }
@@ -182,29 +212,43 @@ export function RevenueDashboard() {
     statisticsCount: statistics.length,
   });
 
-  // Prepare chart data - always show full week (Mon-Sun) or full year (12 months)
+  // Prepare chart data - show weekly or monthly view based on period
   const chartData: ChartData[] = (() => {
-    if (period === "daily") {
+    if (period === "weekly") {
       // Show full week Monday to Sunday
       const days = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"];
-      const weekData: ChartData[] = days.map((dayLabel, index) => ({
+      const weekData: ChartData[] = days.map((dayLabel) => ({
         day: dayLabel,
         sales: 0,
         count: 0,
       }));
 
-      // Map statistics to correct day of week
+      // Use dailyBreakdown data from statistics for accurate daily values
       statistics.forEach((stat) => {
-        const date = new Date(stat.date);
-        const dayOfWeek = date.getDay(); // 0=Sunday, 1=Monday, ..., 6=Saturday
-        // Convert to Monday=0, Tuesday=1, ..., Sunday=6
-        const dayIndex = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+        if (stat.dailyBreakdown && stat.dailyBreakdown.length > 0) {
+          // Use actual daily breakdown data
+          stat.dailyBreakdown.forEach((dailyData) => {
+            // Map dayOfWeek to array index: Monday=0, ..., Sunday=6
+            // dayOfWeek: 0=Sunday, 1=Monday, ..., 6=Saturday
+            let dayIndex: number;
+            if (dailyData.dayOfWeek === 0) {
+              dayIndex = 6; // Sunday -> CN (index 6)
+            } else {
+              dayIndex = dailyData.dayOfWeek - 1; // Monday=0, Tuesday=1, etc.
+            }
 
-        weekData[dayIndex] = {
-          day: days[dayIndex],
-          sales: (weekData[dayIndex].sales || 0) + stat.totalRevenue,
-          count: (weekData[dayIndex].count || 0) + stat.totalOrders,
-        };
+            weekData[dayIndex].sales += dailyData.revenue;
+            weekData[dayIndex].count += dailyData.orders;
+          });
+        } else if (stat.period === "weekly") {
+          // Fallback for old reports without dailyBreakdown
+          const dailyAvg = stat.totalRevenue / 7;
+          const ordersAvg = stat.totalOrders / 7;
+          weekData.forEach((day) => {
+            day.sales += dailyAvg;
+            day.count += ordersAvg;
+          });
+        }
       });
 
       return weekData;
@@ -218,14 +262,14 @@ export function RevenueDashboard() {
 
       // Map statistics to correct month
       statistics.forEach((stat) => {
-        const date = new Date(stat.date);
-        const monthIndex = date.getMonth(); // 0-11
+        if (stat.startDate) {
+          const date = new Date(stat.startDate);
+          const monthIndex = date.getMonth(); // 0-11
 
-        monthData[monthIndex] = {
-          day: `T${monthIndex + 1}`,
-          sales: (monthData[monthIndex].sales || 0) + stat.totalRevenue,
-          count: (monthData[monthIndex].count || 0) + stat.totalOrders,
-        };
+          // Aggregate all revenue/orders for this month
+          monthData[monthIndex].sales += stat.totalRevenue;
+          monthData[monthIndex].count += stat.totalOrders;
+        }
       });
 
       return monthData;
@@ -304,15 +348,15 @@ export function RevenueDashboard() {
         </div>
         <div className="flex gap-2 flex-wrap">
           <Button
-            onClick={() => setPeriod("daily")}
+            onClick={() => setPeriod("weekly")}
             className={`h-11 px-6 rounded-xl transition-all ${
-              period === "daily"
+              period === "weekly"
                 ? "bg-gradient-to-r from-orange-500 to-amber-600 text-white"
                 : "bg-white text-amber-900 border-2 border-orange-200"
             }`}
           >
             <Calendar className="h-4 w-4 mr-2" />
-            Theo ngày
+            Theo tuần
           </Button>
           <Button
             onClick={() => setPeriod("monthly")}
@@ -334,9 +378,12 @@ export function RevenueDashboard() {
                 <ChevronDown className="h-4 w-4 ml-2" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56 rounded-xl border-2 border-orange-100">
+            <DropdownMenuContent
+              align="end"
+              className="w-56 rounded-xl border-2 border-orange-100"
+            >
               <DropdownMenuItem
-                onClick={handleGenerateLastMonth}
+                onClick={handleGenerateWeekly}
                 disabled={generating}
                 className="cursor-pointer focus:bg-orange-50 hover:bg-orange-50 transition-colors"
               >
@@ -345,7 +392,19 @@ export function RevenueDashboard() {
                 ) : (
                   <FileText className="h-4 w-4 mr-2" />
                 )}
-                <span>Tạo 30 ngày gần nhất</span>
+                <span>Tạo báo cáo tuần (7 ngày)</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={handleGenerateMonthly}
+                disabled={generating}
+                className="cursor-pointer focus:bg-orange-50 hover:bg-orange-50 transition-colors"
+              >
+                {generating ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <FileText className="h-4 w-4 mr-2" />
+                )}
+                <span>Tạo báo cáo tháng (30 ngày)</span>
               </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={() => setShowGenerateDialog(true)}
@@ -377,10 +436,7 @@ export function RevenueDashboard() {
       </div>
 
       {/* Generate Custom Report Dialog */}
-      <Dialog
-        open={showGenerateDialog}
-        onOpenChange={setShowGenerateDialog}
-      >
+      <Dialog open={showGenerateDialog} onOpenChange={setShowGenerateDialog}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="text-amber-900">
@@ -435,15 +491,15 @@ export function RevenueDashboard() {
 
       {/* View Reports Dialog */}
       <Dialog open={showReportsList} onOpenChange={setShowReportsList}>
-          <DialogContent 
+        <DialogContent
           className="!w-[95vw] !max-w-[1400px] !h-[90vh] !max-h-[90vh] p-0 overflow-hidden"
-          style={{ 
-            display: 'flex', 
-            flexDirection: 'column',
-            width: '95vw',
-            maxWidth: '1400px',
-            height: '90vh',
-            maxHeight: '90vh'
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            width: "95vw",
+            maxWidth: "1400px",
+            height: "90vh",
+            maxHeight: "90vh",
           }}
         >
           <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0 border-b">
@@ -452,115 +508,160 @@ export function RevenueDashboard() {
             </DialogTitle>
           </DialogHeader>
           <div className="flex-1 overflow-y-auto min-h-0 px-6 py-4">
-                {statistics.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center h-full text-center py-12">
-                    <FileText className="h-12 w-12 text-amber-600/30 mb-3" />
-                    <p className="text-amber-600">Chưa có báo cáo nào</p>
-                    <p className="text-amber-700/70 text-sm mt-2">
-                      Sử dụng các nút "Tạo 30 ngày" hoặc "Tạo báo cáo" để tạo
-                      báo cáo mới
+            {statistics.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full text-center py-12">
+                <FileText className="h-12 w-12 text-amber-600/30 mb-3" />
+                <p className="text-amber-600">Chưa có báo cáo nào</p>
+                <p className="text-amber-700/70 text-sm mt-2">
+                  Sử dụng menu "Báo cáo" để tạo báo cáo tuần, tháng hoặc tùy
+                  chỉnh
+                </p>
+              </div>
+            ) : (
+              <>
+                <div className="mb-4 p-4 bg-orange-50 rounded-xl border border-orange-200">
+                  <p className="text-amber-900 font-medium">
+                    Tổng số báo cáo: {statistics.length}
+                  </p>
+                  {filterStartDate && filterEndDate && (
+                    <p className="text-amber-700 text-sm mt-1">
+                      Lọc: Từ {filterStartDate} đến {filterEndDate}
                     </p>
-                  </div>
-                ) : (
-                  <>
-                    <div className="mb-4 p-4 bg-orange-50 rounded-xl border border-orange-200">
-                      <p className="text-amber-900 font-medium">
-                        Tổng số báo cáo: {statistics.length}{" "}
-                        {period === "daily" ? "ngày" : "tháng"}
-                      </p>
-                      {filterStartDate && filterEndDate && (
-                        <p className="text-amber-700 text-sm mt-1">
-                          Từ {filterStartDate} đến {filterEndDate}
-                        </p>
-                      )}
-                    </div>
-                    <div className="grid gap-4">
-                      {statistics.map((stat) => (
-                        <Card
-                          key={stat.id}
-                          className="p-4 border-2 border-orange-100 hover:shadow-lg transition-all"
-                        >
-                          <div className="flex items-start justify-between gap-4">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-2">
-                                <Calendar className="h-4 w-4 text-orange-600" />
-                                <span className="font-semibold text-amber-900">
-                                  {new Date(stat.date).toLocaleDateString(
+                  )}
+                </div>
+                <div className="grid gap-4">
+                  {statistics.map((stat) => (
+                    <Card
+                      key={stat.id}
+                      className="p-4 border-2 border-orange-100 hover:shadow-lg transition-all"
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Calendar className="h-4 w-4 text-orange-600" />
+                            <span className="font-semibold text-amber-900">
+                              {stat.startDate && stat.endDate
+                                ? `${new Date(
+                                    stat.startDate
+                                  ).toLocaleDateString("vi-VN")} - ${new Date(
+                                    stat.endDate
+                                  ).toLocaleDateString("vi-VN")}`
+                                : new Date(stat.date).toLocaleDateString(
                                     "vi-VN"
                                   )}
-                                </span>
-                                <span className="px-2 py-1 bg-orange-100 text-orange-700 text-xs rounded-full">
-                                  {stat.period === "daily" ? "Ngày" : "Tháng"}
-                                </span>
-                              </div>
-                              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-3">
-                                <div>
-                                  <p className="text-xs text-amber-700/70">
-                                    Doanh thu
-                                  </p>
-                                  <p className="font-semibold text-orange-600">
-                                    {stat.totalRevenue.toLocaleString("vi-VN")}đ
-                                  </p>
-                                </div>
-                                <div>
-                                  <p className="text-xs text-amber-700/70">
-                                    Đơn hàng
-                                  </p>
-                                  <p className="font-semibold text-orange-600">
-                                    {stat.totalOrders}
-                                  </p>
-                                </div>
-                                <div>
-                                  <p className="text-xs text-amber-700/70">
-                                    TB/đơn
-                                  </p>
-                                  <p className="font-semibold text-orange-600">
-                                    {stat.averageOrderValue.toLocaleString(
-                                      "vi-VN",
-                                      {
-                                        maximumFractionDigits: 0,
-                                      }
-                                    )}
-                                    đ
-                                  </p>
-                                </div>
-                                <div>
-                                  <p className="text-xs text-amber-700/70">
-                                    SP đã bán
-                                  </p>
-                                  <p className="font-semibold text-orange-600">
-                                    {stat.totalProductsSold}
-                                  </p>
-                                </div>
-                              </div>
-                              {stat.topProducts &&
-                                stat.topProducts.length > 0 && (
-                                  <div className="mt-3 pt-3 border-t border-orange-100">
-                                    <p className="text-xs text-amber-700/70 mb-2">
-                                      Top sản phẩm:
-                                    </p>
-                                    <div className="flex flex-wrap gap-2">
-                                      {stat.topProducts
-                                        .slice(0, 3)
-                                        .map((product, idx) => (
-                                          <span
-                                            key={idx}
-                                            className="px-2 py-1 bg-amber-50 text-amber-800 text-xs rounded-lg"
-                                          >
-                                            {product.itemName} (
-                                            {product.totalQuantity})
-                                          </span>
-                                        ))}
-                                    </div>
-                                  </div>
+                            </span>
+                            <span className="px-2 py-1 bg-orange-100 text-orange-700 text-xs rounded-full">
+                              {stat.period === "weekly"
+                                ? "Tuần"
+                                : stat.period === "monthly"
+                                ? "Tháng"
+                                : stat.period === "custom"
+                                ? "Tùy chỉnh"
+                                : "Ngày"}
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-3">
+                            <div>
+                              <p className="text-xs text-amber-700/70">
+                                Doanh thu
+                              </p>
+                              <p className="font-semibold text-orange-600">
+                                {stat.totalRevenue.toLocaleString("vi-VN")}đ
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-amber-700/70">
+                                Đơn hàng
+                              </p>
+                              <p className="font-semibold text-orange-600">
+                                {stat.totalOrders}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-amber-700/70">
+                                TB/đơn
+                              </p>
+                              <p className="font-semibold text-orange-600">
+                                {stat.averageOrderValue.toLocaleString(
+                                  "vi-VN",
+                                  {
+                                    maximumFractionDigits: 0,
+                                  }
                                 )}
+                                đ
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-amber-700/70">
+                                SP đã bán
+                              </p>
+                              <p className="font-semibold text-orange-600">
+                                {stat.totalProductsSold}
+                              </p>
                             </div>
                           </div>
-                        </Card>
-                      ))}
-                    </div>
-                  </>
-                )}
+                          {stat.topProducts && stat.topProducts.length > 0 && (
+                            <div className="mt-3 pt-3 border-t border-orange-100">
+                              <p className="text-xs text-amber-700/70 mb-2">
+                                Top sản phẩm:
+                              </p>
+                              <div className="flex flex-wrap gap-2">
+                                {stat.topProducts
+                                  .slice(0, 3)
+                                  .map((product, idx) => (
+                                    <span
+                                      key={idx}
+                                      className="px-2 py-1 bg-amber-50 text-amber-800 text-xs rounded-lg"
+                                    >
+                                      {product.itemName} (
+                                      {product.totalQuantity})
+                                    </span>
+                                  ))}
+                              </div>
+                            </div>
+                          )}
+                          {stat.dailyBreakdown &&
+                            stat.dailyBreakdown.length > 0 && (
+                              <div className="mt-3 pt-3 border-t border-orange-100">
+                                <p className="text-xs text-amber-700/70 mb-2">
+                                  Chi tiết theo ngày:
+                                </p>
+                                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2 text-xs">
+                                  {stat.dailyBreakdown.map((day, idx) => (
+                                    <div
+                                      key={idx}
+                                      className="p-2 bg-orange-50 rounded-lg"
+                                    >
+                                      <p className="font-medium text-orange-700">
+                                        {day.dayName}
+                                      </p>
+                                      <p className="text-amber-700/70 text-[10px]">
+                                        {new Date(day.date).toLocaleDateString(
+                                          "vi-VN",
+                                          {
+                                            day: "2-digit",
+                                            month: "2-digit",
+                                          }
+                                        )}
+                                      </p>
+                                      <p className="font-semibold text-orange-600 mt-1">
+                                        {day.revenue.toLocaleString("vi-VN")}đ
+                                      </p>
+                                      <p className="text-amber-700/70">
+                                        {day.orders} đơn
+                                      </p>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         </DialogContent>
       </Dialog>
@@ -601,10 +702,7 @@ export function RevenueDashboard() {
           </Button>
           <div className="text-sm text-amber-700/70">
             {statistics.length > 0 && (
-              <span>
-                Hiển thị {statistics.length}{" "}
-                {period === "daily" ? "ngày" : "tháng"}
-              </span>
+              <span>Hiển thị {statistics.length} báo cáo</span>
             )}
           </div>
         </div>
@@ -690,12 +788,12 @@ export function RevenueDashboard() {
         <Card className="p-6 rounded-2xl border-2 border-orange-100">
           <div className="mb-4">
             <h3 className="text-amber-900 mb-1">
-              {period === "daily"
-                ? "Doanh thu theo ngày"
+              {period === "weekly"
+                ? "Doanh thu theo tuần"
                 : "Doanh thu theo tháng"}
             </h3>
             <p className="text-amber-700/70">
-              {period === "daily" ? "7 ngày gần nhất" : "6 tháng gần nhất"}
+              {period === "weekly" ? "Dữ liệu theo tuần" : "Dữ liệu theo tháng"}
             </p>
           </div>
           <ResponsiveContainer width="100%" height={300}>

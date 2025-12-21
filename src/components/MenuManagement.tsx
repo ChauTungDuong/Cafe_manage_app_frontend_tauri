@@ -46,8 +46,13 @@ import type {
   CreateRecipeIngredientDto,
 } from "../types/api";
 import { toast } from "sonner";
+import type { User } from "../types/user";
 
-export function MenuManagement() {
+interface MenuManagementProps {
+  currentUser?: User | null;
+}
+
+export function MenuManagement({ currentUser }: MenuManagementProps) {
   // Data state
   const [items, setItems] = useState<Item[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -432,32 +437,8 @@ export function MenuManagement() {
   };
 
   // Recipe Management Functions
-  const handleOpenRecipeForm = async (recipe?: Recipe) => {
-    // Load ingredients when opening recipe form
-    await loadIngredients();
-
-    if (recipe) {
-      // Edit mode
-      setEditingRecipe(recipe);
-      setRecipeFormData({
-        name: recipe.name,
-        description: recipe.description || "",
-        ingredients: recipe.recipeIngredients.map((ri) => ({
-          ingredientId: ri.ingredient.id,
-          amount: ri.amount,
-        })),
-      });
-    } else {
-      // Add mode
-      setEditingRecipe(null);
-      setRecipeFormData({
-        name: "",
-        description: "",
-        ingredients: [],
-      });
-    }
-    setIsRecipeFormDialogOpen(true);
-  };
+  // Recipe Management Functions
+  // (removed unused `handleOpenRecipeForm` to avoid TS6133 - function wasn't referenced)
 
   const handleCloseRecipeForm = () => {
     setIsRecipeFormDialogOpen(false);
@@ -773,9 +754,15 @@ export function MenuManagement() {
         {/* Header */}
         <div className="flex justify-between items-center flex-wrap gap-4">
           <div>
-            <h2 className="text-amber-900 mb-1">Quản lý thực đơn</h2>
+            <h2 className="text-amber-900 mb-1">
+              {currentUser?.role === "admin"
+                ? "Quản lý menu"
+                : "Xem menu, danh mục và công thức"}
+            </h2>
             <p className="text-amber-700/70">
-              Quản lý sản phẩm, danh mục và công thức
+              {currentUser?.role === "admin"
+                ? "Quản lý sản phẩm, danh mục và công thức"
+                : ""}
             </p>
           </div>
         </div>
@@ -824,19 +811,25 @@ export function MenuManagement() {
             <div className="flex justify-between items-center">
               <div>
                 <h3 className="text-lg font-semibold text-amber-900">
-                  Quản lý sản phẩm ({items.length})
+                  {currentUser?.role === "admin"
+                    ? `Quản lý sản phẩm (${items.length})`
+                    : `Danh sách sản phẩm (${items.length})`}
                 </h3>
                 <p className="text-sm text-amber-700/70">
-                  Tạo và quản lý các sản phẩm trong menu
+                  {currentUser?.role === "admin"
+                    ? "Tạo và quản lý các sản phẩm trong menu"
+                    : "Xem danh sách sản phẩm trong menu"}
                 </p>
               </div>
-              <Button
-                onClick={() => handleOpenDialog()}
-                className="bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white"
-              >
-                <Plus className="h-5 w-5 mr-2" />
-                Thêm sản phẩm
-              </Button>
+              {currentUser?.role === "admin" && (
+                <Button
+                  onClick={() => handleOpenDialog()}
+                  className="bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white"
+                >
+                  <Plus className="h-5 w-5 mr-2" />
+                  Thêm sản phẩm
+                </Button>
+              )}
             </div>
 
             {/* Add/Edit Item Dialog */}
@@ -1210,25 +1203,27 @@ export function MenuManagement() {
                         </div>
 
                         <div className="flex flex-col gap-2">
-                          <div className="flex gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="flex-1 border-orange-200 hover:bg-orange-50"
-                              onClick={() => handleOpenDialog(item)}
-                            >
-                              <Edit className="h-4 w-4 mr-1" />
-                              Sửa
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="border-red-200 hover:bg-red-50 text-red-600"
-                              onClick={() => handleDelete(item.id, item.name)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
+                          {currentUser?.role === "admin" && (
+                            <div className="flex gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="flex-1 border-orange-200 hover:bg-orange-50"
+                                onClick={() => handleOpenDialog(item)}
+                              >
+                                <Edit className="h-4 w-4 mr-1" />
+                                Sửa
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="border-red-200 hover:bg-red-50 text-red-600"
+                                onClick={() => handleDelete(item.id, item.name)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          )}
                           <Button
                             variant="outline"
                             size="sm"
@@ -1256,19 +1251,25 @@ export function MenuManagement() {
             <div className="flex justify-between items-center">
               <div>
                 <h3 className="text-lg font-semibold text-amber-900">
-                  Quản lý danh mục ({categories.length})
+                  {currentUser?.role === "admin"
+                    ? `Quản lý danh mục (${categories.length})`
+                    : `Danh sách danh mục (${categories.length})`}
                 </h3>
                 <p className="text-sm text-amber-700/70">
-                  Tạo và quản lý các danh mục sản phẩm
+                  {currentUser?.role === "admin"
+                    ? "Tạo và quản lý các danh mục sản phẩm"
+                    : "Xem danh sách danh mục sản phẩm"}
                 </p>
               </div>
-              <Button
-                onClick={() => handleOpenCategoryDialog()}
-                className="bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white"
-              >
-                <Plus className="h-5 w-5 mr-2" />
-                Thêm danh mục
-              </Button>
+              {currentUser?.role === "admin" && (
+                <Button
+                  onClick={() => handleOpenCategoryDialog()}
+                  className="bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white"
+                >
+                  <Plus className="h-5 w-5 mr-2" />
+                  Thêm danh mục
+                </Button>
+              )}
             </div>
 
             {/* Category Dialog */}
@@ -1384,40 +1385,42 @@ export function MenuManagement() {
                                 {itemCount} sản phẩm
                               </p>
                             </div>
-                            <div
-                              className="flex gap-1"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() =>
-                                  handleOpenCategoryDialog(category)
-                                }
-                                className="border-purple-200 hover:bg-purple-50"
+                            {currentUser?.role === "admin" && (
+                              <div
+                                className="flex gap-1"
+                                onClick={(e) => e.stopPropagation()}
                               >
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() =>
-                                  handleDeleteCategory(
-                                    category.id,
-                                    category.name
-                                  )
-                                }
-                                className="border-red-200 hover:bg-red-50 text-red-600"
-                                disabled={itemCount > 0}
-                                title={
-                                  itemCount > 0
-                                    ? "Không thể xóa danh mục đang có sản phẩm"
-                                    : "Xóa danh mục"
-                                }
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() =>
+                                    handleOpenCategoryDialog(category)
+                                  }
+                                  className="border-purple-200 hover:bg-purple-50"
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() =>
+                                    handleDeleteCategory(
+                                      category.id,
+                                      category.name
+                                    )
+                                  }
+                                  className="border-red-200 hover:bg-red-50 text-red-600"
+                                  disabled={itemCount > 0}
+                                  title={
+                                    itemCount > 0
+                                      ? "Không thể xóa danh mục đang có sản phẩm"
+                                      : "Xóa danh mục"
+                                  }
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            )}
                           </div>
                         </Card>
                       );
@@ -1522,29 +1525,35 @@ export function MenuManagement() {
             <div className="flex justify-between items-center">
               <div>
                 <h3 className="text-lg font-semibold text-amber-900">
-                  Quản lý công thức ({allRecipes.length})
+                  {currentUser?.role === "admin"
+                    ? `Quản lý công thức pha chế (${allRecipes.length})`
+                    : `Danh sách công thức pha chế (${allRecipes.length})`}
                 </h3>
                 <p className="text-sm text-amber-700/70">
-                  Tạo và quản lý công thức pha chế cho các món
+                  {currentUser?.role === "admin"
+                    ? "Tạo và quản lý các công thức pha chế cho sản phẩm"
+                    : "Xem danh sách công thức pha chế cho sản phẩm"}
                 </p>
               </div>
-              <Button
-                onClick={() => {
-                  setEditingRecipeInTab(null);
-                  setRecipeTabFormData({
-                    name: "",
-                    description: "",
-                    itemId: "",
-                    ingredients: [],
-                  });
-                  loadIngredients(); // Load ingredients when opening form
-                  setIsRecipeTabFormOpen(true);
-                }}
-                className="bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Thêm công thức
-              </Button>
+              {currentUser?.role === "admin" && (
+                <Button
+                  onClick={() => {
+                    setEditingRecipeInTab(null);
+                    setRecipeTabFormData({
+                      name: "",
+                      description: "",
+                      itemId: "",
+                      ingredients: [],
+                    });
+                    loadIngredients(); // Load ingredients when opening form
+                    setIsRecipeTabFormOpen(true);
+                  }}
+                  className="bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Thêm công thức
+                </Button>
+              )}
             </div>
 
             {/* Recipes List */}
@@ -1599,55 +1608,57 @@ export function MenuManagement() {
                           </div>
                         </div>
                       </div>
-                      <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={async () => {
-                            setEditingRecipeInTab(recipe);
-                            setRecipeTabFormData({
-                              name: "",
-                              description: "",
-                              itemId: recipe.item?.id || "",
-                              ingredients: recipe.recipeIngredients.map(
-                                (ri) => ({
-                                  ingredientId: ri.ingredient.id,
-                                  amount: ri.amount,
-                                })
-                              ),
-                            });
-                            await loadIngredients();
-                            setIsRecipeTabFormOpen(true);
-                          }}
-                          className="border-orange-200 hover:bg-orange-50"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={async () => {
-                            if (
-                              window.confirm(
-                                `Bạn có chắc muốn xóa công thức của món "${recipe.item?.name}"?`
-                              )
-                            ) {
-                              try {
-                                await recipesApi.delete(recipe.id);
-                                await loadAllRecipes();
-                              } catch (err: any) {
-                                alert(
-                                  err.response?.data?.message ||
-                                    "Không thể xóa công thức!"
-                                );
+                      {currentUser?.role === "admin" && (
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={async () => {
+                              setEditingRecipeInTab(recipe);
+                              setRecipeTabFormData({
+                                name: "",
+                                description: "",
+                                itemId: recipe.item?.id || "",
+                                ingredients: recipe.recipeIngredients.map(
+                                  (ri) => ({
+                                    ingredientId: ri.ingredient.id,
+                                    amount: ri.amount,
+                                  })
+                                ),
+                              });
+                              await loadIngredients();
+                              setIsRecipeTabFormOpen(true);
+                            }}
+                            className="border-orange-200 hover:bg-orange-50"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={async () => {
+                              if (
+                                window.confirm(
+                                  `Bạn có chắc muốn xóa công thức của món "${recipe.item?.name}"?`
+                                )
+                              ) {
+                                try {
+                                  await recipesApi.delete(recipe.id);
+                                  await loadAllRecipes();
+                                } catch (err: any) {
+                                  alert(
+                                    err.response?.data?.message ||
+                                      "Không thể xóa công thức!"
+                                  );
+                                }
                               }
-                            }
-                          }}
-                          className="border-red-200 hover:bg-red-50 text-red-600"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
+                            }}
+                            className="border-red-200 hover:bg-red-50 text-red-600"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   </Card>
                 ))}
@@ -1875,6 +1886,7 @@ export function MenuManagement() {
                       alert("Cập nhật công thức thành công!");
                     } else {
                       await recipesApi.create({
+                        name: recipeTabFormData.name || "",
                         itemId: recipeTabFormData.itemId,
                         ingredients: recipeTabFormData.ingredients,
                       });
@@ -1939,22 +1951,6 @@ export function MenuManagement() {
                   <p className="text-amber-600 mb-4">
                     Món này chưa có công thức
                   </p>
-                  <Button
-                    onClick={() => {
-                      setRecipeTabFormData({
-                        name: "",
-                        description: "",
-                        itemId: selectedItemForRecipe?.id || "",
-                        ingredients: [],
-                      });
-                      loadIngredients();
-                      setIsRecipeTabFormOpen(true);
-                    }}
-                    className="bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white"
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Thêm công thức
-                  </Button>
                 </div>
               ) : (
                 <div className="space-y-4 py-4">
@@ -1969,47 +1965,49 @@ export function MenuManagement() {
                             Công thức: {selectedItemForRecipe?.name}
                           </h4>
                         </div>
-                        <div className="flex gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={async () => {
-                              setEditingRecipeInTab(recipe);
-                              setRecipeTabFormData({
-                                name: "",
-                                description: "",
-                                itemId:
-                                  recipe.item?.id ||
-                                  selectedItemForRecipe?.id ||
-                                  "",
-                                ingredients: recipe.recipeIngredients.map(
-                                  (ri) => ({
-                                    ingredientId: ri.ingredient.id,
-                                    amount: ri.amount,
-                                  })
-                                ),
-                              });
-                              await loadIngredients();
-                              setIsRecipeTabFormOpen(true);
-                            }}
-                            className="border-orange-200 hover:bg-orange-50"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() =>
-                              handleDeleteRecipe(
-                                recipe.id,
-                                selectedItemForRecipe?.name || "công thức này"
-                              )
-                            }
-                            className="border-red-200 hover:bg-red-50 text-red-600"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
+                        {currentUser?.role === "admin" && (
+                          <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={async () => {
+                                setEditingRecipeInTab(recipe);
+                                setRecipeTabFormData({
+                                  name: "",
+                                  description: "",
+                                  itemId:
+                                    recipe.item?.id ||
+                                    selectedItemForRecipe?.id ||
+                                    "",
+                                  ingredients: recipe.recipeIngredients.map(
+                                    (ri) => ({
+                                      ingredientId: ri.ingredient.id,
+                                      amount: ri.amount,
+                                    })
+                                  ),
+                                });
+                                await loadIngredients();
+                                setIsRecipeTabFormOpen(true);
+                              }}
+                              className="border-orange-200 hover:bg-orange-50"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() =>
+                                handleDeleteRecipe(
+                                  recipe.id,
+                                  selectedItemForRecipe?.name || "công thức này"
+                                )
+                              }
+                              className="border-red-200 hover:bg-red-50 text-red-600"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        )}
                       </div>
                       <div className="space-y-2">
                         {recipe.recipeIngredients.map((recipeIng) => (
@@ -2041,24 +2039,6 @@ export function MenuManagement() {
             </ScrollArea>
 
             <div className="flex gap-3 pt-4 border-t">
-              {recipes.length > 0 && (
-                <Button
-                  onClick={() => {
-                    setRecipeTabFormData({
-                      name: "",
-                      description: "",
-                      itemId: selectedItemForRecipe?.id || "",
-                      ingredients: [],
-                    });
-                    loadIngredients();
-                    setIsRecipeTabFormOpen(true);
-                  }}
-                  className="bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Thêm công thức
-                </Button>
-              )}
               <Button
                 variant="outline"
                 className="flex-1"

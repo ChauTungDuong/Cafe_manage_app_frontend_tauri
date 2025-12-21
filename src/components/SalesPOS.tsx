@@ -241,8 +241,9 @@ export function SalesPOS({ currentUser }: SalesPOSProps) {
   const addToOrder = (item: Item) => {
     // Check stock
     const currentQuantity = order.find((o) => o.id === item.id)?.quantity || 0;
-    if (currentQuantity >= item.amountLeft) {
-      toast.error(`Không đủ hàng! Còn lại: ${item.amountLeft}`);
+    const available = item.amountLeft ?? 0;
+    if (currentQuantity >= available) {
+      toast.error(`Không đủ hàng! Còn lại: ${available}`);
       return;
     }
 
@@ -266,8 +267,9 @@ export function SalesPOS({ currentUser }: SalesPOSProps) {
         if (item.id === id) {
           const newQuantity = Math.max(1, item.quantity + delta);
           // Check stock limit
-          if (newQuantity > item.amountLeft) {
-            toast.error(`Không đủ hàng! Còn lại: ${item.amountLeft}`);
+          const available2 = item.amountLeft ?? 0;
+          if (newQuantity > available2) {
+            toast.error(`Không đủ hàng! Còn lại: ${available2}`);
             return item;
           }
           return { ...item, quantity: newQuantity };

@@ -10,7 +10,6 @@ import { TableManagement } from "./components/TableManagement";
 import { RevenueDashboard } from "./components/RevenueDashboard";
 import { UserManagement } from "./components/UserManagement";
 import { OrderHistory } from "./components/OrderHistory";
-import { SystemSettings } from "./components/SystemSettings";
 import { Profile } from "./components/Profile";
 import { InventoryManagement } from "./components/InventoryManagement";
 import { TaxManagement } from "./components/TaxManagement";
@@ -19,7 +18,6 @@ import {
   UtensilsCrossed,
   LayoutGrid,
   TrendingUp,
-  Settings,
   LogOut,
   Users,
   Receipt,
@@ -36,7 +34,6 @@ import { logout, authApi } from "./lib/api";
 type AdminView =
   | "users"
   | "revenue"
-  | "system-settings"
   | "menu"
   | "tables"
   | "orders"
@@ -185,12 +182,6 @@ export default function App() {
       view: "orders" as AdminView,
     },
     {
-      id: "system-settings",
-      icon: Settings,
-      label: "Cài đặt hệ thống",
-      view: "system-settings" as AdminView,
-    },
-    {
       id: "profile",
       icon: UserCircle,
       label: "Cá nhân",
@@ -209,19 +200,19 @@ export default function App() {
     {
       id: "menu",
       icon: UtensilsCrossed,
-      label: "Quản lý menu",
+      label: "Menu",
       view: "menu" as StaffView,
     },
     {
       id: "inventory",
       icon: Package,
-      label: "Quản lý kho",
+      label: "Kho nguyên liệu",
       view: "inventory" as StaffView,
     },
     {
       id: "tables",
       icon: LayoutGrid,
-      label: "Quản lý bàn",
+      label: "Cập nhật bàn",
       view: "tables" as StaffView,
     },
     {
@@ -334,14 +325,19 @@ export default function App() {
             <>
               {currentAdminView === "users" && <UserManagement />}
               {currentAdminView === "revenue" && <RevenueDashboard />}
-              {currentAdminView === "menu" && <MenuManagement />}
-              {currentAdminView === "inventory" && <InventoryManagement />}
+              {currentAdminView === "menu" && (
+                <MenuManagement currentUser={currentUser} />
+              )}
+              {currentAdminView === "inventory" && (
+                <InventoryManagement currentUser={currentUser} />
+              )}
               {currentAdminView === "taxes" && <TaxManagement />}
-              {currentAdminView === "tables" && <TableManagement />}
+              {currentAdminView === "tables" && (
+                <TableManagement currentUser={currentUser} />
+              )}
               {currentAdminView === "orders" && (
                 <OrderHistory currentUser={currentUser} />
               )}
-              {currentAdminView === "system-settings" && <SystemSettings />}
               {currentAdminView === "profile" && currentUser && (
                 <Profile user={currentUser} />
               )}
@@ -354,10 +350,16 @@ export default function App() {
               {currentStaffView === "sales" && (
                 <SalesPOS currentUser={currentUser || undefined} />
               )}
-              {currentStaffView === "menu" && <MenuManagement />}
-              {currentStaffView === "inventory" && <InventoryManagement />}
+              {currentStaffView === "menu" && (
+                <MenuManagement currentUser={currentUser} />
+              )}
+              {currentStaffView === "inventory" && (
+                <InventoryManagement currentUser={currentUser} />
+              )}
               {/* {currentStaffView === "taxes" && <TaxManagement />} */}
-              {currentStaffView === "tables" && <TableManagement />}
+              {currentStaffView === "tables" && (
+                <TableManagement currentUser={currentUser} />
+              )}
               {currentStaffView === "orders" && (
                 <OrderHistory currentUser={currentUser} />
               )}

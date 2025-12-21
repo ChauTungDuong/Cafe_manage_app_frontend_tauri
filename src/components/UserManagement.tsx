@@ -30,7 +30,7 @@ import {
 } from "lucide-react";
 import { ScrollArea } from "./ui/scroll-area";
 import { usersApi } from "../lib/api";
-import type { User, CreateUserDto } from "../types/api";
+import type { User } from "../types/api";
 
 export function UserManagement() {
   // Data state

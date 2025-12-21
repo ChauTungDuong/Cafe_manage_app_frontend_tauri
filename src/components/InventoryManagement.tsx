@@ -30,8 +30,13 @@ import type {
   MeasureUnit,
 } from "../types/api";
 import { toast } from "sonner";
+import type { User } from "../types/user";
 
-export function InventoryManagement() {
+interface InventoryManagementProps {
+  currentUser?: User | null;
+}
+
+export function InventoryManagement({ currentUser }: InventoryManagementProps) {
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -264,182 +269,190 @@ export function InventoryManagement() {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-amber-900 mb-1">Quản lý kho nguyên liệu</h2>
+          <h2 className="text-amber-900 mb-1">
+            {currentUser?.role === "admin"
+              ? `Quản lý kho nguyên liệu (${totalIngredients})`
+              : `Danh sách nguyên liệu (${totalIngredients})`}
+          </h2>
           <p className="text-amber-700/70">
-            Theo dõi và quản lý nguyên liệu trong kho
+            {currentUser?.role === "admin"
+              ? "Theo dõi và quản lý nguyên liệu trong kho"
+              : "Theo dõi nguyên liệu trong kho"}
           </p>
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button
-              onClick={() => handleOpenDialog()}
-              className="bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white"
-            >
-              <Plus className="h-5 w-5 mr-2" />
-              Thêm nguyên liệu
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[500px] max-h-[80vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>
-                {editingIngredient
-                  ? "Chỉnh sửa nguyên liệu"
-                  : "Thêm nguyên liệu mới"}
-              </DialogTitle>
-              <DialogDescription>
-                {editingIngredient
-                  ? "Cập nhật thông tin nguyên liệu"
-                  : "Nhập thông tin nguyên liệu mới"}
-              </DialogDescription>
-            </DialogHeader>
+        {currentUser?.role === "admin" && (
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button
+                onClick={() => handleOpenDialog()}
+                className="bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white"
+              >
+                <Plus className="h-5 w-5 mr-2" />
+                Thêm nguyên liệu
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[500px] max-h-[80vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>
+                  {editingIngredient
+                    ? "Chỉnh sửa nguyên liệu"
+                    : "Thêm nguyên liệu mới"}
+                </DialogTitle>
+                <DialogDescription>
+                  {editingIngredient
+                    ? "Cập nhật thông tin nguyên liệu"
+                    : "Nhập thông tin nguyên liệu mới"}
+                </DialogDescription>
+              </DialogHeader>
 
-            <div className="space-y-4 py-4">
-              {/* Image Upload */}
-              <div className="flex gap-3 items-start">
-                <div className="flex-shrink-0">
-                  <div className="w-20 h-20 border-2 border-dashed border-orange-300 rounded-lg overflow-hidden bg-orange-50 flex items-center justify-center">
-                    {imagePreview ? (
-                      <img
-                        src={imagePreview}
-                        alt="Preview"
-                        className="w-full h-full object-contain p-1"
-                      />
-                    ) : (
-                      <div className="flex flex-col items-center justify-center text-gray-400">
-                        <Package className="h-12 w-12 mb-2" />
-                        <span className="text-xs">Chưa có ảnh</span>
-                      </div>
-                    )}
-                  </div>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageChange}
-                    className="hidden"
-                    style={{ display: "none" }}
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="w-full mt-2 flex items-center justify-center gap-2"
-                  >
-                    <Camera className="h-4 w-4" />
-                    Chọn ảnh
-                  </Button>
-                  <p className="text-xs text-gray-400 text-center mt-1">
-                    JPG, PNG, GIF (max 10MB)
-                  </p>
-                </div>
-                <div className="flex-1 space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Tên nguyên liệu *</Label>
-                    <Input
-                      id="name"
-                      value={formData.name}
-                      onChange={(e) =>
-                        setFormData({ ...formData, name: e.target.value })
-                      }
-                      placeholder="Sữa tươi, Đường trắng, Trà xanh..."
+              <div className="space-y-4 py-4">
+                {/* Image Upload */}
+                <div className="flex gap-3 items-start">
+                  <div className="flex-shrink-0">
+                    <div className="w-20 h-20 border-2 border-dashed border-orange-300 rounded-lg overflow-hidden bg-orange-50 flex items-center justify-center">
+                      {imagePreview ? (
+                        <img
+                          src={imagePreview}
+                          alt="Preview"
+                          className="w-full h-full object-contain p-1"
+                        />
+                      ) : (
+                        <div className="flex flex-col items-center justify-center text-gray-400">
+                          <Package className="h-12 w-12 mb-2" />
+                          <span className="text-xs">Chưa có ảnh</span>
+                        </div>
+                      )}
+                    </div>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageChange}
+                      className="hidden"
+                      style={{ display: "none" }}
                     />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="amountLeft">Số lượng hiện có *</Label>
-                    <Input
-                      id="amountLeft"
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={formData.amountLeft}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          amountLeft: Number(e.target.value),
-                        })
-                      }
-                      placeholder="0"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="minAmount">Số lượng tối thiểu *</Label>
-                    <Input
-                      id="minAmount"
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={formData.minAmount || 0}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          minAmount: Number(e.target.value),
-                        })
-                      }
-                      placeholder="0"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="measureUnit">Đơn vị đo *</Label>
-                    <select
-                      id="measureUnit"
-                      value={formData.measureUnit}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          measureUnit: e.target.value as MeasureUnit,
-                        })
-                      }
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="w-full mt-2 flex items-center justify-center gap-2"
                     >
-                      <option value="g">g (gram)</option>
-                      <option value="kg">kg (kilogram)</option>
-                      <option value="l">l (liter)</option>
-                      <option value="ml">ml (milliliter)</option>
-                      <option value="pcs">pcs (pieces)</option>
-                      <option value="tsp">tsp (teaspoon)</option>
-                      <option value="tbsp">tbsp (tablespoon)</option>
-                    </select>
+                      <Camera className="h-4 w-4" />
+                      Chọn ảnh
+                    </Button>
+                    <p className="text-xs text-gray-400 text-center mt-1">
+                      JPG, PNG, GIF (max 10MB)
+                    </p>
+                  </div>
+                  <div className="flex-1 space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="name">Tên nguyên liệu *</Label>
+                      <Input
+                        id="name"
+                        value={formData.name}
+                        onChange={(e) =>
+                          setFormData({ ...formData, name: e.target.value })
+                        }
+                        placeholder="Sữa tươi, Đường trắng, Trà xanh..."
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="amountLeft">Số lượng hiện có *</Label>
+                      <Input
+                        id="amountLeft"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={formData.amountLeft}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            amountLeft: Number(e.target.value),
+                          })
+                        }
+                        placeholder="0"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="minAmount">Số lượng tối thiểu *</Label>
+                      <Input
+                        id="minAmount"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={formData.minAmount || 0}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            minAmount: Number(e.target.value),
+                          })
+                        }
+                        placeholder="0"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="measureUnit">Đơn vị đo *</Label>
+                      <select
+                        id="measureUnit"
+                        value={formData.measureUnit}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            measureUnit: e.target.value as MeasureUnit,
+                          })
+                        }
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <option value="g">g (gram)</option>
+                        <option value="kg">kg (kilogram)</option>
+                        <option value="l">l (liter)</option>
+                        <option value="ml">ml (milliliter)</option>
+                        <option value="pcs">pcs (pieces)</option>
+                        <option value="tsp">tsp (teaspoon)</option>
+                        <option value="tbsp">tbsp (tablespoon)</option>
+                      </select>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
 
-            {error && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
-                {error}
+              {error && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
+                  {error}
+                </div>
+              )}
+
+              <div className="flex gap-3">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={handleCloseDialog}
+                  disabled={isSaving}
+                >
+                  Hủy
+                </Button>
+                <Button
+                  className="flex-1 bg-gradient-to-r from-orange-500 to-amber-600"
+                  onClick={handleSave}
+                  disabled={isSaving}
+                >
+                  {isSaving ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Đang lưu...
+                    </>
+                  ) : (
+                    "Lưu"
+                  )}
+                </Button>
               </div>
-            )}
-
-            <div className="flex gap-3">
-              <Button
-                variant="outline"
-                className="flex-1"
-                onClick={handleCloseDialog}
-                disabled={isSaving}
-              >
-                Hủy
-              </Button>
-              <Button
-                className="flex-1 bg-gradient-to-r from-orange-500 to-amber-600"
-                onClick={handleSave}
-                disabled={isSaving}
-              >
-                {isSaving ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Đang lưu...
-                  </>
-                ) : (
-                  "Lưu"
-                )}
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
 
       {error && (
@@ -564,27 +577,29 @@ export function InventoryManagement() {
                     </p>
                   </div>
 
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1 border-orange-200 hover:bg-orange-50"
-                      onClick={() => handleOpenDialog(ingredient)}
-                    >
-                      <Edit className="h-4 w-4 mr-1" />
-                      Sửa
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="border-red-200 hover:bg-red-50 text-red-600"
-                      onClick={() =>
-                        handleDelete(ingredient.id, ingredient.name)
-                      }
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
+                  {currentUser?.role === "admin" && (
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1 border-orange-200 hover:bg-orange-50"
+                        onClick={() => handleOpenDialog(ingredient)}
+                      >
+                        <Edit className="h-4 w-4 mr-1" />
+                        Sửa
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="border-red-200 hover:bg-red-50 text-red-600"
+                        onClick={() =>
+                          handleDelete(ingredient.id, ingredient.name)
+                        }
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </Card>
             ))}

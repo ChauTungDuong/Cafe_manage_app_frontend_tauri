@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { Card } from "./ui/card";
 import { Button } from "./ui/button";
-import { Badge } from "./ui/badge";
 import { Plus, Edit, Trash2, Users, Loader2, TableIcon } from "lucide-react";
 import {
   Dialog,
@@ -23,8 +22,13 @@ import {
 import { ScrollArea } from "./ui/scroll-area";
 import { tablesApi } from "../lib/api";
 import type { Table, CreateTableDto } from "../types/api";
+import type { User } from "../types/user";
 
-export function TableManagement() {
+interface TableManagementProps {
+  currentUser?: User | null;
+}
+
+export function TableManagement({ currentUser }: TableManagementProps) {
   // Data state
   const [tables, setTables] = useState<Table[]>([]);
 
@@ -65,30 +69,7 @@ export function TableManagement() {
     }
   };
 
-  const getStatusInfo = (status: string) => {
-    switch (status) {
-      case "available":
-        return {
-          label: "Trống",
-          color: "bg-green-100 text-green-700 border-green-300",
-        };
-      case "occupied":
-        return {
-          label: "Đang dùng",
-          color: "bg-red-100 text-red-700 border-red-300",
-        };
-      case "reserved":
-        return {
-          label: "Đã đặt",
-          color: "bg-yellow-100 text-yellow-700 border-yellow-300",
-        };
-      default:
-        return {
-          label: status,
-          color: "bg-gray-100 text-gray-700 border-gray-300",
-        };
-    }
-  };
+  // getStatusInfo removed from this component because status badge is no longer displayed here
 
   const handleOpenDialog = (table?: Table) => {
     if (table) {
@@ -135,7 +116,6 @@ export function TableManagement() {
         const updateDto = {
           name: formData.name,
           seat: seatCount,
-          status: formData.status,
         };
 
         await tablesApi.update(editingTable.id, updateDto);
@@ -213,115 +193,103 @@ export function TableManagement() {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-amber-900 mb-1">Quản lý bàn</h2>
+          <h2 className="text-amber-900 mb-1">
+            {currentUser?.role === "admin"
+              ? `Quản lý bàn (${tables.length})`
+              : `Cập nhật bàn (${tables.length})`}
+          </h2>
           <p className="text-amber-700/70">
-            Quản lý trạng thái và thông tin bàn
+            {currentUser?.role === "admin"
+              ? "Quản lý các bàn trong quán"
+              : "Cập nhật trạng thái bàn trong quán"}
           </p>
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button
-              onClick={() => handleOpenDialog()}
-              className="bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white"
-            >
-              <Plus className="h-5 w-5 mr-2" />
-              Thêm bàn
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[500px]">
-            <DialogHeader>
-              <DialogTitle>
-                {editingTable ? "Chỉnh sửa bàn" : "Thêm bàn mới"}
-              </DialogTitle>
-              <DialogDescription>
-                {editingTable
-                  ? "Cập nhật thông tin bàn"
-                  : "Nhập thông tin bàn mới"}
-              </DialogDescription>
-            </DialogHeader>
+        {currentUser?.role === "admin" && (
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button
+                onClick={() => handleOpenDialog()}
+                className="bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white"
+              >
+                <Plus className="h-5 w-5 mr-2" />
+                Thêm bàn
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[500px]">
+              <DialogHeader>
+                <DialogTitle>
+                  {editingTable ? "Chỉnh sửa bàn" : "Thêm bàn mới"}
+                </DialogTitle>
+                <DialogDescription>
+                  {editingTable
+                    ? "Cập nhật thông tin bàn"
+                    : "Nhập thông tin bàn mới"}
+                </DialogDescription>
+              </DialogHeader>
 
-            <div className="space-y-4 py-4">
-              {/* Name */}
-              <div className="space-y-2">
-                <Label htmlFor="name">Tên bàn *</Label>
-                <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) =>
-                    setFormData({ ...formData, name: e.target.value })
-                  }
-                  placeholder="VD: Bàn 1, VIP 1"
-                />
+              <div className="space-y-4 py-4">
+                {/* Name */}
+                <div className="space-y-2">
+                  <Label htmlFor="name">Tên bàn *</Label>
+                  <Input
+                    id="name"
+                    value={formData.name}
+                    onChange={(e) =>
+                      setFormData({ ...formData, name: e.target.value })
+                    }
+                    placeholder="VD: Bàn 1, VIP 1"
+                  />
+                </div>
+
+                {/* Seats */}
+                <div className="space-y-2">
+                  <Label htmlFor="seat">Số ghế *</Label>
+                  <Input
+                    id="seat"
+                    type="number"
+                    min="1"
+                    value={formData.seat}
+                    onChange={(e) =>
+                      setFormData({ ...formData, seat: e.target.value })
+                    }
+                    placeholder="4"
+                  />
+                </div>
               </div>
 
-              {/* Seats */}
-              <div className="space-y-2">
-                <Label htmlFor="seat">Số ghế *</Label>
-                <Input
-                  id="seat"
-                  type="number"
-                  min="1"
-                  value={formData.seat}
-                  onChange={(e) =>
-                    setFormData({ ...formData, seat: e.target.value })
-                  }
-                  placeholder="4"
-                />
-              </div>
+              {error && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
+                  {error}
+                </div>
+              )}
 
-              {/* Status */}
-              <div className="space-y-2">
-                <Label>Trạng thái</Label>
-                <Select
-                  value={formData.status}
-                  onValueChange={(value: any) =>
-                    setFormData({ ...formData, status: value })
-                  }
+              <div className="flex gap-3">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={handleCloseDialog}
+                  disabled={isSaving}
                 >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="available">✅ Trống</SelectItem>
-                    <SelectItem value="occupied">🔴 Đang dùng</SelectItem>
-                    <SelectItem value="reserved">⚠️ Đã đặt</SelectItem>
-                  </SelectContent>
-                </Select>
+                  Hủy
+                </Button>
+                <Button
+                  className="flex-1 bg-gradient-to-r from-orange-500 to-amber-600"
+                  onClick={handleSave}
+                  disabled={isSaving}
+                >
+                  {isSaving ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Đang lưu...
+                    </>
+                  ) : (
+                    "Lưu"
+                  )}
+                </Button>
               </div>
-            </div>
-
-            {error && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
-                {error}
-              </div>
-            )}
-
-            <div className="flex gap-3">
-              <Button
-                variant="outline"
-                className="flex-1"
-                onClick={handleCloseDialog}
-                disabled={isSaving}
-              >
-                Hủy
-              </Button>
-              <Button
-                className="flex-1 bg-gradient-to-r from-orange-500 to-amber-600"
-                onClick={handleSave}
-                disabled={isSaving}
-              >
-                {isSaving ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Đang lưu...
-                  </>
-                ) : (
-                  "Lưu"
-                )}
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
 
       {/* Error Display */}
@@ -370,29 +338,23 @@ export function TableManagement() {
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
             {tables.map((table) => {
-              const statusInfo = getStatusInfo(table.status);
               return (
                 <Card
                   key={table.id}
-                  className="p-6 hover:shadow-lg transition-all border-2 border-orange-100 hover:border-orange-300 rounded-2xl aspect-square flex flex-col justify-between"
+                  className="p-4 hover:shadow-lg transition-all border-2 border-orange-100 hover:border-orange-300 rounded-xl flex flex-col justify-between"
                 >
-                  <div className="space-y-4">
+                  <div className="space-y-3">
                     {/* Table Name */}
-                    <div className="flex flex-col items-center gap-2 text-center">
-                      <h4 className="text-2xl font-bold text-amber-900">
+                    <div className="flex flex-col items-center text-center">
+                      <h4 className="text-xl font-bold text-amber-900">
                         {table.name}
                       </h4>
-                      <Badge
-                        className={`${statusInfo.color} text-sm px-3 py-1`}
-                      >
-                        {statusInfo.label}
-                      </Badge>
                     </div>
 
                     {/* Seats */}
                     <div className="flex items-center justify-center gap-2 text-amber-700">
-                      <Users className="h-5 w-5" />
-                      <span className="text-base font-medium">
+                      <Users className="h-4 w-4" />
+                      <span className="text-sm font-medium">
                         {table.seat} ghế
                       </span>
                     </div>
@@ -404,38 +366,40 @@ export function TableManagement() {
                         handleStatusChange(table, value)
                       }
                     >
-                      <SelectTrigger className="h-10 border-orange-200">
+                      <SelectTrigger className="h-9 border-orange-200">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="available">✅ Trống</SelectItem>
-                        <SelectItem value="occupied">🔴 Đang dùng</SelectItem>
-                        <SelectItem value="reserved">⚠️ Đã đặt</SelectItem>
+                        <SelectItem value="available">○ Trống</SelectItem>
+                        <SelectItem value="occupied">● Đang dùng</SelectItem>
+                        <SelectItem value="reserved">◐ Đã đặt</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
 
                   <div className="space-y-2">
                     {/* Actions */}
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex-1 border-orange-200 hover:bg-orange-50"
-                        onClick={() => handleOpenDialog(table)}
-                      >
-                        <Edit className="h-4 w-4 mr-1" />
-                        Sửa
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="border-red-200 hover:bg-red-50 text-red-600"
-                        onClick={() => handleDelete(table.id, table.name)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
+                    {currentUser?.role === "admin" && (
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1 border-orange-200 hover:bg-orange-50"
+                          onClick={() => handleOpenDialog(table)}
+                        >
+                          <Edit className="h-4 w-4 mr-1" />
+                          Sửa
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="border-red-200 hover:bg-red-50 text-red-600"
+                          onClick={() => handleDelete(table.id, table.name)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </Card>
               );

@@ -176,8 +176,19 @@ api.interceptors.response.use(
 
     const originalRequest = error.config as any;
 
-    // Nếu lỗi 401 và chưa retry
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    // Skip refresh token logic for auth endpoints (login, register, forgot-password, etc.)
+    const isAuthEndpoint =
+      originalRequest.url?.includes("/auth/login") ||
+      originalRequest.url?.includes("/auth/register") ||
+      originalRequest.url?.includes("/auth/forgot-password") ||
+      originalRequest.url?.includes("/auth/reset-password");
+
+    // Nếu lỗi 401 và chưa retry và KHÔNG phải auth endpoint
+    if (
+      error.response?.status === 401 &&
+      !originalRequest._retry &&
+      !isAuthEndpoint
+    ) {
       if (isRefreshing) {
         // Đang refresh, đợi trong queue
         return new Promise((resolve, reject) => {
@@ -397,8 +408,9 @@ import type {
   Payment,
   CreatePaymentDto,
   Statistic,
-  GenerateStatsResponse,
-  GenerateRangeResponse,
+  CreateReportResponse,
+  CreateReportRequest,
+  ReportType,
 } from "../types/api";
 
 export const usersApi = {
@@ -415,14 +427,27 @@ export const usersApi = {
   },
 
   // Create user (ADMIN only)
-  create: async (dto: CreateUserDto): Promise<User> => {
-    const response = await api.post("/users", dto);
+  // Accepts either JSON DTO or FormData for avatar upload
+  create: async (dto: CreateUserDto | FormData): Promise<User> => {
+    const config =
+      dto instanceof FormData
+        ? { headers: { "Content-Type": "multipart/form-data" } }
+        : {};
+    const response = await api.post("/users", dto as any, config);
     return response.data;
   },
 
   // Update user (ADMIN only)
-  update: async (id: string, dto: Partial<CreateUserDto>): Promise<User> => {
-    const response = await api.patch(`/users/${id}`, dto);
+  // Accepts either partial JSON DTO or FormData for avatar upload
+  update: async (
+    id: string,
+    dto: Partial<CreateUserDto> | FormData
+  ): Promise<User> => {
+    const config =
+      dto instanceof FormData
+        ? { headers: { "Content-Type": "multipart/form-data" } }
+        : {};
+    const response = await api.patch(`/users/${id}`, dto as any, config);
     return response.data;
   },
 
@@ -819,11 +844,11 @@ export const menuApi = itemsApi; // Alias for items
 
 // ============ STATISTICS API ============
 export const statisticsApi = {
-  // Get all statistics with optional filters
+  // Get all statistics reports with optional filters
   list: async (params?: {
     startDate?: string;
     endDate?: string;
-    period?: "daily" | "monthly";
+    period?: "daily" | "weekly" | "monthly" | "custom";
   }): Promise<Statistic[]> => {
     const queryParams = new URLSearchParams();
     if (params?.startDate) queryParams.append("startDate", params.startDate);
@@ -831,37 +856,30 @@ export const statisticsApi = {
     if (params?.period) queryParams.append("period", params.period);
 
     const url = queryParams.toString()
-      ? `/statistics?${queryParams}`
-      : "/statistics";
+      ? `/statistics/reports?${queryParams}`
+      : "/statistics/reports";
     const response = await api.get(url);
     return response.data;
   },
 
-  // Get daily statistics for specific date
-  getDaily: async (date: string): Promise<Statistic | null> => {
-    const response = await api.get(`/statistics/daily/${date}`);
+  // Get report by ID
+  getById: async (id: string): Promise<Statistic> => {
+    const response = await api.get(`/statistics/reports/${id}`);
     return response.data;
   },
 
-  // Get monthly statistics for specific month
-  getMonthly: async (yearMonth: string): Promise<Statistic | null> => {
-    const response = await api.get(`/statistics/monthly/${yearMonth}`);
-    return response.data;
-  },
-
-  // Generate statistics for last 30 days
-  generateLastMonth: async (): Promise<GenerateStatsResponse> => {
-    const response = await api.post("/statistics/generate");
-    return response.data;
-  },
-
-  // Generate statistics for custom date range
-  generateRange: async (
-    startDate: string,
-    endDate: string
-  ): Promise<GenerateRangeResponse> => {
-    const params = new URLSearchParams({ startDate, endDate });
-    const response = await api.post(`/statistics/generate-range?${params}`);
+  // Create a new report
+  createReport: async (
+    reportType: ReportType,
+    startDate?: string,
+    endDate?: string
+  ): Promise<CreateReportResponse> => {
+    const payload: CreateReportRequest = { reportType };
+    if (reportType === "custom" && startDate && endDate) {
+      payload.startDate = startDate;
+      payload.endDate = endDate;
+    }
+    const response = await api.post("/statistics/reports", payload);
     return response.data;
   },
 };
