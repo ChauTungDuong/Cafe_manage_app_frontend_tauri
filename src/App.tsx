@@ -151,7 +151,7 @@ export default function App() {
     {
       id: "revenue",
       icon: TrendingUp,
-      label: "Doanh thu",
+      label: "Báo cáo doanh thu",
       view: "revenue" as AdminView,
     },
     {
@@ -169,7 +169,7 @@ export default function App() {
     {
       id: "taxes",
       icon: Percent,
-      label: "Quản lý thuế",
+      label: "Quản lý thuế & giảm giá",
       view: "taxes" as AdminView,
     },
     {
@@ -209,7 +209,7 @@ export default function App() {
     {
       id: "menu",
       icon: UtensilsCrossed,
-      label: "Thực đơn",
+      label: "Quản lý menu",
       view: "menu" as StaffView,
     },
     {
@@ -265,7 +265,7 @@ export default function App() {
                   className="h-10 w-10"
                 />
                 <div className="flex-1">
-                  <h2 className="text-amber-900">Cafe Management</h2>
+                  <h2 className="text-amber-900">Kafein App</h2>
                   <p className="text-amber-700/70 text-sm">
                     {userRole === "admin" ? "Quản trị viên" : "Nhân viên"}
                   </p>
@@ -338,7 +338,9 @@ export default function App() {
               {currentAdminView === "inventory" && <InventoryManagement />}
               {currentAdminView === "taxes" && <TaxManagement />}
               {currentAdminView === "tables" && <TableManagement />}
-              {currentAdminView === "orders" && <OrderHistory />}
+              {currentAdminView === "orders" && (
+                <OrderHistory currentUser={currentUser} />
+              )}
               {currentAdminView === "system-settings" && <SystemSettings />}
               {currentAdminView === "profile" && currentUser && (
                 <Profile user={currentUser} />
@@ -356,7 +358,9 @@ export default function App() {
               {currentStaffView === "inventory" && <InventoryManagement />}
               {/* {currentStaffView === "taxes" && <TaxManagement />} */}
               {currentStaffView === "tables" && <TableManagement />}
-              {currentStaffView === "orders" && <OrderHistory />}
+              {currentStaffView === "orders" && (
+                <OrderHistory currentUser={currentUser} />
+              )}
               {currentStaffView === "profile" && currentUser && (
                 <Profile user={currentUser} />
               )}

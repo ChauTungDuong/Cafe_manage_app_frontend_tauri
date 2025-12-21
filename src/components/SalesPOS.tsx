@@ -153,8 +153,12 @@ export function SalesPOS({ currentUser }: SalesPOSProps) {
     setIsLoadingItems(true);
     setError("");
     try {
-      const data = await itemsApi.list({ status: "available" });
-      setItems(data);
+      const response: any = await itemsApi.list({ status: "available" });
+      // Handle both array and object with data property
+      const itemsData = Array.isArray(response)
+        ? response
+        : response?.data || response || [];
+      setItems(itemsData);
     } catch (err: any) {
       const message =
         err.response?.data?.message || "Không thể tải danh sách sản phẩm";
@@ -199,7 +203,9 @@ export function SalesPOS({ currentUser }: SalesPOSProps) {
   // Get unique categories from items
   const categories = [
     "all",
-    ...Array.from(new Set(items.map((item) => item.category.name))),
+    ...Array.from(
+      new Set((items || []).map((item) => item.category?.name).filter(Boolean))
+    ),
   ];
 
   // Translate category names to Vietnamese
@@ -230,7 +236,7 @@ export function SalesPOS({ currentUser }: SalesPOSProps) {
   const filteredItems =
     selectedCategory === "all"
       ? items
-      : items.filter((item) => item.category.name === selectedCategory);
+      : items.filter((item) => item.category?.name === selectedCategory);
 
   const addToOrder = (item: Item) => {
     // Check stock
@@ -348,11 +354,29 @@ export function SalesPOS({ currentUser }: SalesPOSProps) {
       // Show payment dialog
       setShowPaymentDialog(true);
     } catch (err: any) {
-      const message =
-        err.response?.data?.message ||
-        "Không thể tạo đơn hàng. Vui lòng thử lại!";
-      setError(message);
-      toast.error(message);
+      // Check if error is about ingredient shortage
+      const errorMessage = err.response?.data?.message || "";
+      let displayMessage = "Không thể tạo đơn hàng. Vui lòng thử lại!";
+
+      if (errorMessage.includes("Not enough ingredient")) {
+        // Extract ingredient and item name from error message
+        // Format: "Not enough ingredient {ingredient_name} for item {item_name}"
+        displayMessage = errorMessage
+          .replace("Not enough ingredient", "Không đủ nguyên liệu")
+          .replace("for item", "cho món");
+      } else if (errorMessage) {
+        displayMessage = errorMessage;
+      }
+
+      setError(displayMessage);
+      toast.error(displayMessage, {
+        duration: 5000,
+        style: {
+          background: "#FEE2E2",
+          color: "#991B1B",
+          border: "2px solid #FCA5A5",
+        },
+      });
       console.error("❌ Create order error:", err);
     } finally {
       setIsProcessing(false);

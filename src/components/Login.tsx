@@ -123,8 +123,8 @@ export function Login({ onLogin }: LoginProps) {
 
     console.log("🔐 Login attempt:", { email, retry: retryCount });
 
-    // Timeout để hiển thị message cold start
-    const coldStartTimer = setTimeout(() => {
+    // Timeout để hiển thị message cold start (chỉ khi response chậm)
+    let coldStartTimer: NodeJS.Timeout | null = setTimeout(() => {
       setLoadingMessage("Server đang khởi động (cold start), vui lòng đợi...");
     }, 5000);
 
@@ -137,23 +137,55 @@ export function Login({ onLogin }: LoginProps) {
         password,
       });
 
-      clearTimeout(coldStartTimer);
+      // Clear timer nếu thành công
+      if (coldStartTimer) {
+        clearTimeout(coldStartTimer);
+        coldStartTimer = null;
+      }
 
       // Đăng nhập thành công
       console.log("✅ Login successful:", response.user);
       onLogin(response.user.role, response.user);
     } catch (err: any) {
-      clearTimeout(coldStartTimer);
+      // Clear timer ngay khi có lỗi
+      if (coldStartTimer) {
+        clearTimeout(coldStartTimer);
+        coldStartTimer = null;
+      }
+
       console.error("❌ Login error:", err);
       console.error("Error details:", {
         message: err.message,
         code: err.code,
         response: err.response,
+        status: err.response?.status,
         stack: err.stack,
       });
 
+      // Kiểm tra loại lỗi dựa vào status code
+      const statusCode = err.response?.status;
+
+      // Xử lý lỗi authentication (401) - sai mật khẩu/email
+      if (statusCode === 401) {
+        setError(
+          err.response?.data?.message ||
+            "Email hoặc mật khẩu không đúng. Vui lòng thử lại!"
+        );
+        // Reset loading state ngay lập tức cho lỗi 401
+        setIsLoading(false);
+        setLoadingMessage("");
+      }
+      // Xử lý lỗi server/cold start (503, 500, 502, 504)
+      else if (statusCode === 503 || statusCode === 502 || statusCode === 504) {
+        setError(
+          "Server đang khởi động (cold start). Vui lòng đợi 30-60 giây và thử lại."
+        );
+        // Reset loading state
+        setIsLoading(false);
+        setLoadingMessage("");
+      }
       // Xử lý lỗi timeout với retry tự động
-      if (err.code === "ECONNABORTED" && retryCount < 2) {
+      else if (err.code === "ECONNABORTED" && retryCount < 2) {
         shouldRetry = true;
         setLoadingMessage(`Timeout. Đang thử lại lần ${retryCount + 2}/3...`);
         console.log(`🔄 Retrying login (${retryCount + 1}/2)...`);
@@ -168,16 +200,36 @@ export function Login({ onLogin }: LoginProps) {
         setError(
           "Không thể kết nối đến server sau 3 lần thử. Server có thể đang khởi động (cold start). Vui lòng thử lại sau 30 giây."
         );
-      } else if (err.response?.data?.message) {
+        // Reset loading state
+        setIsLoading(false);
+        setLoadingMessage("");
+      }
+      // Xử lý các lỗi khác
+      else if (err.response?.data?.message) {
         setError(err.response.data.message);
+        // Reset loading state
+        setIsLoading(false);
+        setLoadingMessage("");
       } else if (err.message) {
         setError(err.message);
+        // Reset loading state
+        setIsLoading(false);
+        setLoadingMessage("");
       } else {
         setError("Đăng nhập thất bại. Vui lòng thử lại!");
+        // Reset loading state
+        setIsLoading(false);
+        setLoadingMessage("");
       }
     } finally {
-      // Chỉ reset loading state nếu không retry
-      if (!shouldRetry) {
+      // Cleanup timer nếu còn tồn tại
+      if (coldStartTimer) {
+        clearTimeout(coldStartTimer);
+        coldStartTimer = null;
+      }
+
+      // Chỉ reset loading state nếu không retry và chưa reset trong catch
+      if (!shouldRetry && isLoading) {
         setIsLoading(false);
         setLoadingMessage("");
       }
@@ -195,8 +247,12 @@ export function Login({ onLogin }: LoginProps) {
 
           {/* Title */}
           <div className="text-center mb-8">
-            <h1 className="text-amber-900 mb-2">Cafe Management</h1>
-            <p className="text-amber-700/70">Hệ thống quản lý quán cafe</p>
+            <h1 className="text-amber-900 mb-2">
+              Kafein - Coffee Shop Management App
+            </h1>
+            <p className="text-amber-700/70">
+              Hệ thống quản lý quán cafe chuyên nghiệp
+            </p>
           </div>
 
           {/* Login Form */}
@@ -271,7 +327,7 @@ export function Login({ onLogin }: LoginProps) {
 
         {/* Footer */}
         <p className="text-center mt-6 text-amber-700/60">
-          © 2024 Cafe Manager System
+          © 2025 - Kafein Coffee Management System
         </p>
       </div>
 

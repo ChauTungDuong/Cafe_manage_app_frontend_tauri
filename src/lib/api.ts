@@ -439,9 +439,19 @@ export const usersApi = {
 };
 
 // ============ CATEGORIES API ============
+export interface CategoryWithItems {
+  category: Category;
+  totalItems: number;
+}
+
+export interface CategoriesResponse {
+  data: CategoryWithItems[];
+  totalCategory: number;
+}
+
 export const categoriesApi = {
   // Get all categories (Public)
-  list: async (): Promise<Category[]> => {
+  list: async (): Promise<CategoriesResponse> => {
     const response = await api.get("/categories");
     return response.data;
   },

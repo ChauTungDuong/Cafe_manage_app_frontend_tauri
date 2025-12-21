@@ -11,7 +11,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "./ui/select";
-import { Receipt, Search, Eye, Loader2, XCircle, Package } from "lucide-react";
+import {
+  Receipt,
+  Search,
+  Eye,
+  Loader2,
+  XCircle,
+  Package,
+  Trash2,
+} from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -22,8 +30,13 @@ import {
 import { Separator } from "./ui/separator";
 import { ordersApi } from "../lib/api";
 import type { Order } from "../types/api";
+import type { User } from "../types/user";
 
-export function OrderHistory() {
+interface OrderHistoryProps {
+  currentUser?: User | null;
+}
+
+export function OrderHistory({ currentUser }: OrderHistoryProps) {
   // Data state
   const [orders, setOrders] = useState<Order[]>([]);
 
@@ -81,6 +94,29 @@ export function OrderHistory() {
       setError(message);
       alert(message);
       console.error("Cancel order error:", err);
+    }
+  };
+
+  const handleDeleteOrder = async (orderId: string, orderCode: string) => {
+    if (
+      !confirm(
+        `Bạn có chắc chắn muốn XÓA VĨNH VIỄN đơn hàng "${orderCode}"?\nThao tác này không thể hoàn tác!`
+      )
+    ) {
+      return;
+    }
+
+    setError("");
+    try {
+      await ordersApi.remove(orderId);
+      alert("Xóa đơn hàng thành công!");
+      await loadOrders();
+      setIsDetailDialogOpen(false);
+    } catch (err: any) {
+      const message = err.response?.data?.message || "Không thể xóa đơn hàng";
+      setError(message);
+      alert(message);
+      console.error("Delete order error:", err);
     }
   };
 
@@ -292,6 +328,18 @@ export function OrderHistory() {
                         <Eye className="h-4 w-4 mr-1" />
                         Chi tiết
                       </Button>
+                      {currentUser?.role === "admin" && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="border-red-200 hover:bg-red-50 text-red-600"
+                          onClick={() =>
+                            handleDeleteOrder(order.id, order.orderCode)
+                          }
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </Card>
@@ -327,235 +375,262 @@ export function OrderHistory() {
           {selectedOrder && (
             <div className="flex-1 overflow-y-auto min-h-0 px-6 py-4">
               <div className="space-y-4">
-              {/* Order Info */}
-              <Card className="p-4 bg-orange-50 border-orange-200">
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div>
-                    <span className="text-amber-600">Mã đơn:</span>
-                    <p className="font-semibold text-amber-900">
-                      {selectedOrder.orderCode}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-amber-600">Trạng thái:</span>
-                    <p>
-                      <Badge
-                        className={getStatusInfo(selectedOrder.status).color}
-                      >
-                        {getStatusInfo(selectedOrder.status).label}
-                      </Badge>
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-amber-600">Bàn:</span>
-                    <p className="font-semibold text-amber-900">
-                      {selectedOrder.table?.name || "N/A"}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-amber-600">Ngày tạo:</span>
-                    <p className="font-semibold text-amber-900">
-                      {new Date(selectedOrder.createdAt).toLocaleString(
-                        "vi-VN"
-                      )}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-amber-600">Thuế & Giảm giá:</span>
-                    <div className="space-y-1 mt-1">
-                      {selectedOrder.taxesAndDiscounts.length > 0 ? (
-                        selectedOrder.taxesAndDiscounts.map((td) => (
-                          <p
-                            key={td.id}
-                            className="font-semibold text-amber-900"
-                          >
-                            {td.name} ({td.type === "tax" ? "+" : "-"}
-                            {parseFloat(td.percent)}%)
-                          </p>
-                        ))
-                      ) : (
-                        <p className="text-amber-700/50">Không có</p>
-                      )}
+                {/* Order Info */}
+                <Card className="p-4 bg-orange-50 border-orange-200">
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <span className="text-amber-600">Mã đơn:</span>
+                      <p className="font-semibold text-amber-900">
+                        {selectedOrder.orderCode}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-amber-600">Trạng thái:</span>
+                      <p>
+                        <Badge
+                          className={getStatusInfo(selectedOrder.status).color}
+                        >
+                          {getStatusInfo(selectedOrder.status).label}
+                        </Badge>
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-amber-600">Bàn:</span>
+                      <p className="font-semibold text-amber-900">
+                        {selectedOrder.table?.name || "N/A"}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-amber-600">Ngày tạo:</span>
+                      <p className="font-semibold text-amber-900">
+                        {new Date(selectedOrder.createdAt).toLocaleString(
+                          "vi-VN"
+                        )}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-amber-600">Thuế & Giảm giá:</span>
+                      <div className="space-y-1 mt-1">
+                        {selectedOrder.taxesAndDiscounts.length > 0 ? (
+                          selectedOrder.taxesAndDiscounts.map((td) => (
+                            <p
+                              key={td.id}
+                              className="font-semibold text-amber-900"
+                            >
+                              {td.name} ({td.type === "tax" ? "+" : "-"}
+                              {parseFloat(td.percent)}%)
+                            </p>
+                          ))
+                        ) : (
+                          <p className="text-amber-700/50">Không có</p>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              </Card>
+                </Card>
 
-              {/* Order Items */}
-              <div>
-                <h4 className="font-semibold text-amber-900 mb-3">Sản phẩm</h4>
-                <div className="space-y-2">
-                  {selectedOrder.orderItems.map((item) => (
-                    <Card key={item.id} className="p-3 border-orange-100">
-                      <div className="flex justify-between items-center">
-                        <div className="flex-1">
-                          <p className="font-medium text-amber-900">
-                            {item.item.name}
-                          </p>
-                          <p className="text-sm text-amber-600">
-                            {item.item.price.toLocaleString("vi-VN")}đ x{" "}
-                            {item.amount}
-                          </p>
-                        </div>
-                        <p className="font-semibold text-orange-600">
-                          {(item.item.price * item.amount).toLocaleString(
-                            "vi-VN"
-                          )}
-                          đ
-                        </p>
-                      </div>
-                    </Card>
-                  ))}
-                </div>
-              </div>
-
-              {/* Payments */}
-              {selectedOrder.payments && selectedOrder.payments.length > 0 && (
+                {/* Order Items */}
                 <div>
                   <h4 className="font-semibold text-amber-900 mb-3">
-                    Thanh toán
+                    Sản phẩm
                   </h4>
-                  <div className="space-y-3">
-                    {selectedOrder.payments.map((payment) => (
-                      <Card
-                        key={payment.id}
-                        className="p-4 border-green-200 bg-green-50"
-                      >
-                        <div className="space-y-3">
-                          <div className="flex justify-between items-center">
-                            <div>
-                              <p className="font-medium text-green-800">
-                                {getPaymentMethodLabel(payment.method)}
-                              </p>
-                              <p className="text-sm text-green-600">
-                                {formatDateTime(payment.createdAt) !== "-"
-                                  ? formatDateTime(payment.createdAt)
-                                  : formatDateTime(selectedOrder?.createdAt)}
-                              </p>
-                            </div>
-                            <p className="text-lg font-bold text-green-800">
-                              {payment.amount.toLocaleString("vi-VN")}đ
+                  <div className="space-y-2">
+                    {selectedOrder.orderItems.map((item) => (
+                      <Card key={item.id} className="p-3 border-orange-100">
+                        <div className="flex justify-between items-center">
+                          <div className="flex-1">
+                            <p className="font-medium text-amber-900">
+                              {item.item.name}
+                            </p>
+                            <p className="text-sm text-amber-600">
+                              {item.item.price.toLocaleString("vi-VN")}đ x{" "}
+                              {item.amount}
                             </p>
                           </div>
-
-                          {/* Display QR Code if available */}
-                          {payment.qrCode && (
-                            <div className="mt-3 flex justify-center">
-                              <img
-                                src={payment.qrCode}
-                                alt="QR Code"
-                                className="w-[138px] h-[138px] border-2 border-green-300 rounded-lg"
-                              />
-                            </div>
-                          )}
+                          <p className="font-semibold text-orange-600">
+                            {(item.item.price * item.amount).toLocaleString(
+                              "vi-VN"
+                            )}
+                            đ
+                          </p>
                         </div>
                       </Card>
                     ))}
                   </div>
                 </div>
-              )}
 
-              {/* Summary */}
-              <Card className="p-4 bg-orange-50 border-orange-200">
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-amber-700">Tạm tính:</span>
-                    <span className="text-amber-900 font-medium">
-                      {(() => {
-                        // Calculate subtotal from order items
+                {/* Payments */}
+                {selectedOrder.payments &&
+                  selectedOrder.payments.length > 0 && (
+                    <div>
+                      <h4 className="font-semibold text-amber-900 mb-3">
+                        Thanh toán
+                      </h4>
+                      <div className="space-y-3">
+                        {selectedOrder.payments.map((payment) => (
+                          <Card
+                            key={payment.id}
+                            className="p-4 border-green-200 bg-green-50"
+                          >
+                            <div className="space-y-3">
+                              <div className="flex justify-between items-center">
+                                <div>
+                                  <p className="font-medium text-green-800">
+                                    {getPaymentMethodLabel(payment.method)}
+                                  </p>
+                                  <p className="text-sm text-green-600">
+                                    {formatDateTime(payment.createdAt) !== "-"
+                                      ? formatDateTime(payment.createdAt)
+                                      : formatDateTime(
+                                          selectedOrder?.createdAt
+                                        )}
+                                  </p>
+                                </div>
+                                <p className="text-lg font-bold text-green-800">
+                                  {payment.amount.toLocaleString("vi-VN")}đ
+                                </p>
+                              </div>
+
+                              {/* Display QR Code if available */}
+                              {payment.qrCode && (
+                                <div className="mt-3 flex justify-center">
+                                  <img
+                                    src={payment.qrCode}
+                                    alt="QR Code"
+                                    className="w-[138px] h-[138px] border-2 border-green-300 rounded-lg"
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          </Card>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                {/* Summary */}
+                <Card className="p-4 bg-orange-50 border-orange-200">
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-amber-700">Tạm tính:</span>
+                      <span className="text-amber-900 font-medium">
+                        {(() => {
+                          // Calculate subtotal from order items
+                          const subtotal = selectedOrder.orderItems.reduce(
+                            (sum, item) => sum + item.item.price * item.amount,
+                            0
+                          );
+                          return subtotal.toLocaleString("vi-VN");
+                        })()}
+                        đ
+                      </span>
+                    </div>
+
+                    {/* Display all taxes */}
+                    {selectedOrder.taxesAndDiscounts
+                      .filter((td) => td.type === "tax")
+                      .map((tax) => {
                         const subtotal = selectedOrder.orderItems.reduce(
                           (sum, item) => sum + item.item.price * item.amount,
                           0
                         );
-                        return subtotal.toLocaleString("vi-VN");
-                      })()}
-                      đ
-                    </span>
-                  </div>
+                        const taxAmount =
+                          (subtotal * parseFloat(tax.percent)) / 100;
+                        return (
+                          <div
+                            key={tax.id}
+                            className="flex justify-between text-sm"
+                          >
+                            <span className="text-amber-700">
+                              {tax.name} (+{parseFloat(tax.percent)}%):
+                            </span>
+                            <span className="text-amber-900 font-medium">
+                              +{taxAmount.toLocaleString("vi-VN")}đ
+                            </span>
+                          </div>
+                        );
+                      })}
 
-                  {/* Display all taxes */}
-                  {selectedOrder.taxesAndDiscounts
-                    .filter((td) => td.type === "tax")
-                    .map((tax) => {
-                      const subtotal = selectedOrder.orderItems.reduce(
-                        (sum, item) => sum + item.item.price * item.amount,
-                        0
-                      );
-                      const taxAmount =
-                        (subtotal * parseFloat(tax.percent)) / 100;
-                      return (
-                        <div
-                          key={tax.id}
-                          className="flex justify-between text-sm"
-                        >
-                          <span className="text-amber-700">
-                            {tax.name} (+{parseFloat(tax.percent)}%):
-                          </span>
-                          <span className="text-amber-900 font-medium">
-                            +{taxAmount.toLocaleString("vi-VN")}đ
-                          </span>
-                        </div>
-                      );
-                    })}
-
-                  {/* Display all discounts */}
-                  {selectedOrder.taxesAndDiscounts
-                    .filter((td) => td.type === "discount")
-                    .map((discount) => {
-                      const subtotal = selectedOrder.orderItems.reduce(
-                        (sum, item) => sum + item.item.price * item.amount,
-                        0
-                      );
-                      // Calculate taxes first
-                      const totalTaxAmount = selectedOrder.taxesAndDiscounts
-                        .filter((td) => td.type === "tax")
-                        .reduce(
-                          (sum, tax) =>
-                            sum + (subtotal * parseFloat(tax.percent)) / 100,
+                    {/* Display all discounts */}
+                    {selectedOrder.taxesAndDiscounts
+                      .filter((td) => td.type === "discount")
+                      .map((discount) => {
+                        const subtotal = selectedOrder.orderItems.reduce(
+                          (sum, item) => sum + item.item.price * item.amount,
                           0
                         );
-                      const subtotalWithTax = subtotal + totalTaxAmount;
-                      const discountAmount =
-                        (subtotalWithTax * parseFloat(discount.percent)) / 100;
-                      return (
-                        <div
-                          key={discount.id}
-                          className="flex justify-between text-sm"
-                        >
-                          <span className="text-amber-700">
-                            {discount.name} (-{parseFloat(discount.percent)}%):
-                          </span>
-                          <span className="text-green-600 font-medium">
-                            -{discountAmount.toLocaleString("vi-VN")}đ
-                          </span>
-                        </div>
-                      );
-                    })}
-                  <Separator className="bg-orange-300" />
-                  <div className="flex justify-between text-lg">
-                    <span className="text-amber-900 font-semibold">
-                      Tổng cộng:
-                    </span>
-                    <span className="text-orange-600 font-bold">
-                      {selectedOrder.totalAmount.toLocaleString("vi-VN")}đ
-                    </span>
+                        // Calculate taxes first
+                        const totalTaxAmount = selectedOrder.taxesAndDiscounts
+                          .filter((td) => td.type === "tax")
+                          .reduce(
+                            (sum, tax) =>
+                              sum + (subtotal * parseFloat(tax.percent)) / 100,
+                            0
+                          );
+                        const subtotalWithTax = subtotal + totalTaxAmount;
+                        const discountAmount =
+                          (subtotalWithTax * parseFloat(discount.percent)) /
+                          100;
+                        return (
+                          <div
+                            key={discount.id}
+                            className="flex justify-between text-sm"
+                          >
+                            <span className="text-amber-700">
+                              {discount.name} (-{parseFloat(discount.percent)}
+                              %):
+                            </span>
+                            <span className="text-green-600 font-medium">
+                              -{discountAmount.toLocaleString("vi-VN")}đ
+                            </span>
+                          </div>
+                        );
+                      })}
+                    <Separator className="bg-orange-300" />
+                    <div className="flex justify-between text-lg">
+                      <span className="text-amber-900 font-semibold">
+                        Tổng cộng:
+                      </span>
+                      <span className="text-orange-600 font-bold">
+                        {selectedOrder.totalAmount.toLocaleString("vi-VN")}đ
+                      </span>
+                    </div>
                   </div>
-                </div>
-              </Card>
+                </Card>
 
-              {/* Cancel Order Button (for pending orders) */}
-              {selectedOrder.status === "pending" && (
-                <Button
-                  variant="destructive"
-                  className="w-full"
-                  onClick={() =>
-                    handleCancelOrder(selectedOrder.id, selectedOrder.orderCode)
-                  }
-                >
-                  <XCircle className="h-4 w-4 mr-2" />
-                  Hủy đơn hàng
-                </Button>
-              )}
+                {/* Cancel Order Button (for pending orders) */}
+                {selectedOrder.status === "pending" && (
+                  <Button
+                    variant="destructive"
+                    className="w-full"
+                    onClick={() =>
+                      handleCancelOrder(
+                        selectedOrder.id,
+                        selectedOrder.orderCode
+                      )
+                    }
+                  >
+                    <XCircle className="h-4 w-4 mr-2" />
+                    Hủy đơn hàng
+                  </Button>
+                )}
+
+                {/* Delete Order Button (for admin only) */}
+                {currentUser?.role === "admin" && (
+                  <Button
+                    variant="destructive"
+                    className="w-full bg-red-600 hover:bg-red-700"
+                    onClick={() =>
+                      handleDeleteOrder(
+                        selectedOrder.id,
+                        selectedOrder.orderCode
+                      )
+                    }
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Xóa đơn hàng vĩnh viễn
+                  </Button>
+                )}
               </div>
             </div>
           )}

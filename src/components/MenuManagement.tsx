@@ -15,7 +15,6 @@ import {
   ChefHat,
   Info,
   Refrigerator,
-  Coffee,
   Save,
 } from "lucide-react";
 import { Input } from "./ui/input";
@@ -23,7 +22,6 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "./ui/dialog";
@@ -53,6 +51,10 @@ export function MenuManagement() {
   // Data state
   const [items, setItems] = useState<Item[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  // Normalize categories in case backend returns { data: [{ category, totalItems }] }
+  const normalizedCategories: Category[] = ((categories as any[]) || []).map(
+    (c) => (c && (c as any).category ? (c as any).category : c)
+  );
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
 
   // UI state
@@ -72,6 +74,15 @@ export function MenuManagement() {
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false);
   const [isLoadingRecipes, setIsLoadingRecipes] = useState(false);
+
+  // State for viewing category items
+  const [isCategoryItemsDialogOpen, setIsCategoryItemsDialogOpen] =
+    useState(false);
+  const [selectedCategoryForItems, setSelectedCategoryForItems] = useState<{
+    category: Category;
+    totalItems: number;
+  } | null>(null);
+  const [categoryItemsList, setCategoryItemsList] = useState<Item[]>([]);
 
   // State for Recipes Tab (all recipes)
   const [allRecipes, setAllRecipes] = useState<Recipe[]>([]);
@@ -134,13 +145,13 @@ export function MenuManagement() {
     setError("");
     try {
       console.log("📦 Loading items...");
-      const response = await itemsApi.list();
+      const response: any = await itemsApi.list();
       console.log("✅ Items loaded:", response);
       // Handle both array and object with data property
       const itemsData = Array.isArray(response)
         ? response
         : response?.data || response || [];
-      setItems(itemsData);
+      setItems(itemsData as Item[]);
     } catch (err: any) {
       const message =
         err.response?.data?.message || "Không thể tải danh sách sản phẩm";
@@ -160,13 +171,20 @@ export function MenuManagement() {
     setIsLoadingCategories(true);
     try {
       console.log("📂 Loading categories...");
-      const response = await categoriesApi.list();
+      const response: any = await categoriesApi.list();
       console.log("✅ Categories loaded:", response);
-      // Handle both array and object with data property
-      const categoriesData = Array.isArray(response)
-        ? response
-        : response?.data || response || [];
-      setCategories(categoriesData);
+      // New API returns { data: CategoryWithItems[], totalCategory: number }
+      // Extract just the categories for the categories state
+      if (response && response.data) {
+        const categoriesOnly = response.data.map((item: any) => item.category);
+        setCategories(categoriesOnly as Category[]);
+      } else {
+        // Fallback for old format
+        const categoriesData = Array.isArray(response)
+          ? response
+          : response?.data || response || [];
+        setCategories(categoriesData as Category[]);
+      }
     } catch (err: any) {
       console.error("❌ Load categories error:", err);
       console.error("Error details:", {
@@ -185,13 +203,13 @@ export function MenuManagement() {
       console.log("🥬 Loading ingredients...");
       // Import ingredientsApi dynamically only when needed
       const { ingredientsApi } = await import("../lib/api");
-      const response = await ingredientsApi.list();
+      const response: any = await ingredientsApi.list();
       console.log("✅ Ingredients loaded:", response);
       // Handle both array and object with data property
       const ingredientsData = Array.isArray(response)
         ? response
         : response?.data || response || [];
-      setIngredients(ingredientsData);
+      setIngredients(ingredientsData as Ingredient[]);
     } catch (err: any) {
       console.error("❌ Load ingredients error:", err);
     }
@@ -202,13 +220,13 @@ export function MenuManagement() {
     setIsLoadingAllRecipes(true);
     try {
       console.log("📋 Loading all recipes...");
-      const response = await recipesApi.list();
+      const response: any = await recipesApi.list();
       console.log("✅ All recipes loaded:", response);
       // Handle both array and object with data property
       const recipesData = Array.isArray(response)
         ? response
         : response?.data || response || [];
-      setAllRecipes(recipesData);
+      setAllRecipes(recipesData as Recipe[]);
     } catch (err: any) {
       console.error("❌ Load all recipes error:", err);
     } finally {
@@ -650,6 +668,23 @@ export function MenuManagement() {
     }
   };
 
+  // View items in a category
+  const handleViewCategoryItems = async (category: any) => {
+    try {
+      // Use items from backend category response
+      const categoryItems = category.items || [];
+      setSelectedCategoryForItems({
+        category: { id: category.id, name: category.name },
+        totalItems: categoryItems.length,
+      });
+      setCategoryItemsList(categoryItems);
+      setIsCategoryItemsDialogOpen(true);
+    } catch (err: any) {
+      console.error("Error loading category items:", err);
+      alert("Không thể tải danh sách sản phẩm của danh mục");
+    }
+  };
+
   // Translate category names to Vietnamese
   const translateCategory = (categoryName: string | undefined): string => {
     if (!categoryName) return "N/A";
@@ -869,11 +904,13 @@ export function MenuManagement() {
                               />
                             </SelectTrigger>
                             <SelectContent>
-                              {categories.map((cat) => (
-                                <SelectItem key={cat.id} value={cat.name}>
-                                  {cat.name}
-                                </SelectItem>
-                              ))}
+                              {normalizedCategories
+                                .filter((cat) => cat && cat.id && cat.name)
+                                .map((cat) => (
+                                  <SelectItem key={cat.id} value={cat.name}>
+                                    {cat.name}
+                                  </SelectItem>
+                                ))}
                             </SelectContent>
                           </Select>
                           <p className="text-sm text-gray-500">
@@ -1316,64 +1353,165 @@ export function MenuManagement() {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {categories.map((category) => {
-                    const itemCount = items.filter(
-                      (item) => item.category?.id === category.id
-                    ).length;
+                  {normalizedCategories
+                    .filter(
+                      (category) => category && category.id && category.name
+                    )
+                    .map((category) => {
+                      const itemCount =
+                        (category as any).items?.length ||
+                        items.filter(
+                          (item) => item.category?.id === category.id
+                        ).length;
 
-                    return (
-                      <Card
-                        key={category.id}
-                        className="p-4 border-2 border-purple-100 hover:shadow-lg transition-all"
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex-1">
-                            <h4 className="font-semibold text-amber-900 mb-1">
-                              {category.name}
-                            </h4>
-                            {category.description && (
-                              <p className="text-sm text-amber-600 mb-2">
-                                {category.description}
+                      return (
+                        <Card
+                          key={category.id}
+                          className="p-4 border-2 border-purple-100 hover:shadow-lg transition-all cursor-pointer"
+                          onClick={() => handleViewCategoryItems(category)}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex-1">
+                              <h4 className="font-semibold text-amber-900 mb-1">
+                                {category.name}
+                              </h4>
+                              {category.description && (
+                                <p className="text-sm text-amber-600 mb-2">
+                                  {category.description}
+                                </p>
+                              )}
+                              <p className="text-xs text-amber-700/70">
+                                {itemCount} sản phẩm
                               </p>
-                            )}
-                            <p className="text-xs text-amber-700/70">
-                              {itemCount} sản phẩm
-                            </p>
-                          </div>
-                          <div className="flex gap-1">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleOpenCategoryDialog(category)}
-                              className="border-purple-200 hover:bg-purple-50"
+                            </div>
+                            <div
+                              className="flex gap-1"
+                              onClick={(e) => e.stopPropagation()}
                             >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() =>
-                                handleDeleteCategory(category.id, category.name)
-                              }
-                              className="border-red-200 hover:bg-red-50 text-red-600"
-                              disabled={itemCount > 0}
-                              title={
-                                itemCount > 0
-                                  ? "Không thể xóa danh mục đang có sản phẩm"
-                                  : "Xóa danh mục"
-                              }
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() =>
+                                  handleOpenCategoryDialog(category)
+                                }
+                                className="border-purple-200 hover:bg-purple-50"
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() =>
+                                  handleDeleteCategory(
+                                    category.id,
+                                    category.name
+                                  )
+                                }
+                                className="border-red-200 hover:bg-red-50 text-red-600"
+                                disabled={itemCount > 0}
+                                title={
+                                  itemCount > 0
+                                    ? "Không thể xóa danh mục đang có sản phẩm"
+                                    : "Xóa danh mục"
+                                }
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
                           </div>
-                        </div>
-                      </Card>
-                    );
-                  })}
+                        </Card>
+                      );
+                    })}
                 </div>
               )}
             </div>
           </TabsContent>
+
+          {/* Category Items Dialog */}
+          <Dialog
+            open={isCategoryItemsDialogOpen}
+            onOpenChange={setIsCategoryItemsDialogOpen}
+          >
+            <DialogContent className="w-[90vw] max-w-[700px] max-h-[85vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <Package className="h-5 w-5 text-purple-500" />
+                  Sản phẩm trong danh mục:{" "}
+                  {selectedCategoryForItems?.category?.name}
+                </DialogTitle>
+                <DialogDescription>
+                  Tổng {selectedCategoryForItems?.totalItems || 0} sản phẩm
+                </DialogDescription>
+              </DialogHeader>
+
+              <ScrollArea className="max-h-[60vh]">
+                {categoryItemsList.length === 0 ? (
+                  <div className="text-center py-12">
+                    <Package className="h-12 w-12 text-amber-600/30 mx-auto mb-3" />
+                    <p className="text-amber-600">
+                      Danh mục này chưa có sản phẩm nào
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4">
+                    {categoryItemsList.map((item) => (
+                      <Card
+                        key={item.id}
+                        className="p-4 border-2 border-purple-100 hover:shadow-lg transition-all"
+                      >
+                        <div className="flex gap-4">
+                          {item.image && (
+                            <img
+                              src={item.image}
+                              alt={item.name}
+                              className="w-20 h-20 object-cover rounded-lg"
+                            />
+                          )}
+                          <div className="flex-1">
+                            <h4 className="font-semibold text-amber-900 mb-1">
+                              {item.name}
+                            </h4>
+                            <p className="text-sm text-amber-600 mb-2">
+                              {item.price.toLocaleString("vi-VN")}đ
+                            </p>
+                            <Badge
+                              className={
+                                item.status === "available"
+                                  ? "bg-green-100 text-green-700 border-green-300"
+                                  : item.status === "out of stock"
+                                  ? "bg-yellow-100 text-yellow-700 border-yellow-300"
+                                  : "bg-red-100 text-red-700 border-red-300"
+                              }
+                            >
+                              {item.status === "available"
+                                ? "Còn hàng"
+                                : item.status === "out of stock"
+                                ? "Hết hàng"
+                                : "Ngừng bán"}
+                            </Badge>
+                          </div>
+                        </div>
+                        {item.description && (
+                          <p className="text-xs text-amber-600/70 mt-2">
+                            {item.description}
+                          </p>
+                        )}
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </ScrollArea>
+
+              <div className="flex justify-end pt-4 border-t">
+                <Button
+                  variant="outline"
+                  onClick={() => setIsCategoryItemsDialogOpen(false)}
+                >
+                  Đóng
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
 
           {/* Recipes Tab */}
           <TabsContent
@@ -1438,18 +1576,10 @@ export function MenuManagement() {
                           <ChefHat className="h-5 w-5 text-orange-500" />
                           <div>
                             <h4 className="font-semibold text-amber-900">
-                              {recipe.name}
+                              Công thức: {recipe.item?.name || "N/A"}
                             </h4>
-                            <p className="text-sm text-amber-600">
-                              Món: {recipe.item?.name || "N/A"}
-                            </p>
                           </div>
                         </div>
-                        {recipe.description && (
-                          <p className="text-sm text-amber-700/70 mb-3">
-                            {recipe.description}
-                          </p>
-                        )}
                         <div className="space-y-1">
                           <p className="text-xs font-semibold text-amber-800">
                             Nguyên liệu ({recipe.recipeIngredients?.length || 0}
@@ -1476,8 +1606,8 @@ export function MenuManagement() {
                           onClick={async () => {
                             setEditingRecipeInTab(recipe);
                             setRecipeTabFormData({
-                              name: recipe.name,
-                              description: recipe.description || "",
+                              name: "",
+                              description: "",
                               itemId: recipe.item?.id || "",
                               ingredients: recipe.recipeIngredients.map(
                                 (ri) => ({
@@ -1499,7 +1629,7 @@ export function MenuManagement() {
                           onClick={async () => {
                             if (
                               window.confirm(
-                                `Bạn có chắc muốn xóa công thức "${recipe.name}"?`
+                                `Bạn có chắc muốn xóa công thức của món "${recipe.item?.name}"?`
                               )
                             ) {
                               try {
@@ -1559,56 +1689,37 @@ export function MenuManagement() {
             {/* Scrollable Content */}
             <div className="flex-1 overflow-hidden px-6">
               <ScrollArea className="h-full">
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 py-4">
-                  {/* Left Column - Info */}
-                  <div className="lg:col-span-1 space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="recipeName">
-                        Tên công thức <span className="text-red-500">*</span>
-                      </Label>
-                      <Input
-                        id="recipeName"
-                        value={recipeTabFormData.name}
-                        onChange={(e) =>
-                          setRecipeTabFormData({
-                            ...recipeTabFormData,
-                            name: e.target.value,
-                          })
-                        }
-                        placeholder="VD: Công thức Cappuccino"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label>
-                        Chọn món <span className="text-red-500">*</span>
-                      </Label>
-                      <Select
-                        value={recipeTabFormData.itemId}
-                        onValueChange={(value) =>
-                          setRecipeTabFormData({
-                            ...recipeTabFormData,
-                            itemId: value,
-                          })
-                        }
-                        disabled={!!editingRecipeInTab}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Chọn món" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {items.map((item) => (
-                            <SelectItem key={item.id} value={item.id}>
-                              {item.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                <div className="space-y-6 py-4">
+                  {/* Item Selection */}
+                  <div className="space-y-2">
+                    <Label>
+                      Chọn món <span className="text-red-500">*</span>
+                    </Label>
+                    <Select
+                      value={recipeTabFormData.itemId}
+                      onValueChange={(value) =>
+                        setRecipeTabFormData({
+                          ...recipeTabFormData,
+                          itemId: value,
+                        })
+                      }
+                      disabled={!!editingRecipeInTab}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Chọn món" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {items.map((item) => (
+                          <SelectItem key={item.id} value={item.id}>
+                            {item.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
 
-                  {/* Right Column - Ingredients */}
-                  <div className="lg:col-span-2 space-y-4">
+                  {/* Ingredients Section */}
+                  <div className="space-y-4">
                     <div className="flex items-center justify-between">
                       <Label className="text-base font-semibold">
                         Nguyên liệu thành phần (
@@ -1633,100 +1744,103 @@ export function MenuManagement() {
                       </Button>
                     </div>
 
-                    <div className="space-y-3">
-                      {recipeTabFormData.ingredients.map((ing, index) => (
-                        <div
-                          key={index}
-                          className="p-4 border rounded-lg space-y-3 relative group"
-                        >
-                          <button
-                            onClick={() => {
-                              const newIngredients = [
-                                ...recipeTabFormData.ingredients,
-                              ];
-                              newIngredients.splice(index, 1);
-                              setRecipeTabFormData({
-                                ...recipeTabFormData,
-                                ingredients: newIngredients,
-                              });
-                            }}
-                            className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity p-1 text-gray-400 hover:text-red-500"
+                    {/* Fixed height container for ingredients */}
+                    <div className="space-y-3 min-h-[200px]">
+                      {recipeTabFormData.ingredients.length > 0 ? (
+                        recipeTabFormData.ingredients.map((ing, index) => (
+                          <div
+                            key={index}
+                            className="p-4 border rounded-lg space-y-3 relative group"
                           >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                          <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                              <Label className="text-xs">Nguyên liệu</Label>
-                              <Select
-                                value={ing.ingredientId}
-                                onValueChange={(value) => {
-                                  const newIngredients = [
-                                    ...recipeTabFormData.ingredients,
-                                  ];
-                                  newIngredients[index].ingredientId = value;
-                                  setRecipeTabFormData({
-                                    ...recipeTabFormData,
-                                    ingredients: newIngredients,
-                                  });
-                                }}
-                              >
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Chọn nguyên liệu" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {ingredients.map((i) => (
-                                    <SelectItem key={i.id} value={i.id}>
-                                      {i.name} ({i.measureUnit})
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <div className="space-y-2">
-                              <Label className="text-xs">
-                                Số lượng{" "}
-                                {ingredients.find(
-                                  (i) => i.id === ing.ingredientId
-                                )?.measureUnit && (
-                                  <span className="text-gray-500">
-                                    (
-                                    {
-                                      ingredients.find(
-                                        (i) => i.id === ing.ingredientId
-                                      )?.measureUnit
-                                    }
-                                    )
-                                  </span>
-                                )}
-                              </Label>
-                              <Input
-                                type="number"
-                                min="0"
-                                step="0.01"
-                                value={ing.amount}
-                                onChange={(e) => {
-                                  const newIngredients = [
-                                    ...recipeTabFormData.ingredients,
-                                  ];
-                                  newIngredients[index].amount = Number(
-                                    e.target.value
-                                  );
-                                  setRecipeTabFormData({
-                                    ...recipeTabFormData,
-                                    ingredients: newIngredients,
-                                  });
-                                }}
-                                placeholder="0"
-                              />
+                            <button
+                              onClick={() => {
+                                const newIngredients = [
+                                  ...recipeTabFormData.ingredients,
+                                ];
+                                newIngredients.splice(index, 1);
+                                setRecipeTabFormData({
+                                  ...recipeTabFormData,
+                                  ingredients: newIngredients,
+                                });
+                              }}
+                              className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity p-1 text-gray-400 hover:text-red-500"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="space-y-2">
+                                <Label className="text-xs">Nguyên liệu</Label>
+                                <Select
+                                  value={ing.ingredientId}
+                                  onValueChange={(value) => {
+                                    const newIngredients = [
+                                      ...recipeTabFormData.ingredients,
+                                    ];
+                                    newIngredients[index].ingredientId = value;
+                                    setRecipeTabFormData({
+                                      ...recipeTabFormData,
+                                      ingredients: newIngredients,
+                                    });
+                                  }}
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Chọn nguyên liệu" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {ingredients.map((i) => (
+                                      <SelectItem key={i.id} value={i.id}>
+                                        {i.name} ({i.measureUnit})
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div className="space-y-2">
+                                <Label className="text-xs">
+                                  Số lượng{" "}
+                                  {ingredients.find(
+                                    (i) => i.id === ing.ingredientId
+                                  )?.measureUnit && (
+                                    <span className="text-gray-500">
+                                      (
+                                      {
+                                        ingredients.find(
+                                          (i) => i.id === ing.ingredientId
+                                        )?.measureUnit
+                                      }
+                                      )
+                                    </span>
+                                  )}
+                                </Label>
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  value={ing.amount}
+                                  onChange={(e) => {
+                                    const newIngredients = [
+                                      ...recipeTabFormData.ingredients,
+                                    ];
+                                    newIngredients[index].amount = Number(
+                                      e.target.value
+                                    );
+                                    setRecipeTabFormData({
+                                      ...recipeTabFormData,
+                                      ingredients: newIngredients,
+                                    });
+                                  }}
+                                  placeholder="0"
+                                />
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      ))}
-
-                      {recipeTabFormData.ingredients.length === 0 && (
-                        <div className="text-center py-8 border-2 border-dashed rounded-lg text-gray-500">
-                          <Refrigerator className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                          <p className="text-sm">Chưa có nguyên liệu nào</p>
+                        ))
+                      ) : (
+                        <div className="flex items-center justify-center min-h-[200px] border-2 border-dashed rounded-lg text-gray-500 bg-gray-50">
+                          <div className="text-center py-8">
+                            <Refrigerator className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                            <p className="text-sm">Chưa có nguyên liệu nào</p>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -1747,10 +1861,6 @@ export function MenuManagement() {
               <Button
                 className="flex-1 bg-gradient-to-r from-orange-500 to-amber-600"
                 onClick={async () => {
-                  if (!recipeTabFormData.name.trim()) {
-                    alert("Vui lòng nhập tên công thức!");
-                    return;
-                  }
                   if (!recipeTabFormData.itemId) {
                     alert("Vui lòng chọn món!");
                     return;
@@ -1760,15 +1870,11 @@ export function MenuManagement() {
                   try {
                     if (editingRecipeInTab) {
                       await recipesApi.update(editingRecipeInTab.id, {
-                        name: recipeTabFormData.name,
-                        description: recipeTabFormData.description,
                         ingredients: recipeTabFormData.ingredients,
                       });
                       alert("Cập nhật công thức thành công!");
                     } else {
                       await recipesApi.create({
-                        name: recipeTabFormData.name,
-                        description: recipeTabFormData.description,
                         itemId: recipeTabFormData.itemId,
                         ingredients: recipeTabFormData.ingredients,
                       });
@@ -1860,13 +1966,8 @@ export function MenuManagement() {
                       <div className="flex items-start justify-between mb-3">
                         <div>
                           <h4 className="font-semibold text-amber-900 text-lg">
-                            {recipe.name}
+                            Công thức: {selectedItemForRecipe?.name}
                           </h4>
-                          {recipe.description && (
-                            <p className="text-sm text-amber-600 mt-1">
-                              {recipe.description}
-                            </p>
-                          )}
                         </div>
                         <div className="flex gap-2">
                           <Button
@@ -1875,8 +1976,8 @@ export function MenuManagement() {
                             onClick={async () => {
                               setEditingRecipeInTab(recipe);
                               setRecipeTabFormData({
-                                name: recipe.name,
-                                description: recipe.description || "",
+                                name: "",
+                                description: "",
                                 itemId:
                                   recipe.item?.id ||
                                   selectedItemForRecipe?.id ||
@@ -1899,7 +2000,10 @@ export function MenuManagement() {
                             variant="outline"
                             size="sm"
                             onClick={() =>
-                              handleDeleteRecipe(recipe.id, recipe.name)
+                              handleDeleteRecipe(
+                                recipe.id,
+                                selectedItemForRecipe?.name || "công thức này"
+                              )
                             }
                             className="border-red-200 hover:bg-red-50 text-red-600"
                           >
