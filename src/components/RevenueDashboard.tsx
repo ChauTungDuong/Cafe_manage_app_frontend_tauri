@@ -1,40 +1,28 @@
-import { useState, useEffect } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { Card } from "./ui/card";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "./ui/dropdown-menu";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import {
   BarChart,
   Bar,
-  PieChart,
-  Pie,
-  Cell,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
   XAxis,
   YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
 } from "recharts";
 import {
-  TrendingUp,
-  DollarSign,
-  ShoppingBag,
-  RefreshCw,
   Calendar,
+  DollarSign,
   FileText,
   Loader2,
-  ChevronDown,
+  RefreshCw,
+  ShoppingBag,
 } from "lucide-react";
 import { statisticsApi } from "../lib/api";
-import { Statistic } from "../types/api";
+import type { Statistic } from "../types/api";
 
 interface ChartData {
   day: string;
@@ -54,865 +42,517 @@ const COLORS = [
 ];
 
 export function RevenueDashboard() {
-  const [period, setPeriod] = useState<"weekly" | "monthly">("weekly");
-  const [statistics, setStatistics] = useState<Statistic[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [generating, setGenerating] = useState(false);
-  const [error, setError] = useState("");
-  const [showGenerateDialog, setShowGenerateDialog] = useState(false);
-  const [showReportsList, setShowReportsList] = useState(false);
+  const [activeTab, setActiveTab] = useState<"auto" | "manual">("auto");
+  const [autoPeriod, setAutoPeriod] = useState<"daily" | "weekly" | "monthly">(
+    "daily"
+  );
 
-  // Date range for filtering display
-  const [filterStartDate, setFilterStartDate] = useState("");
-  const [filterEndDate, setFilterEndDate] = useState("");
+  const [autoReport, setAutoReport] = useState<Statistic | null>(null);
+  const [manualReport, setManualReport] = useState<Statistic | null>(null);
 
-  // Date range for generating reports
-  const [generateStartDate, setGenerateStartDate] = useState("");
-  const [generateEndDate, setGenerateEndDate] = useState("");
+  const [loadingAuto, setLoadingAuto] = useState(false);
+  const [loadingManual, setLoadingManual] = useState(false);
+  const [creatingManual, setCreatingManual] = useState(false);
+  const [error, setError] = useState<string>("");
 
-  // Load statistics with optional date filter
-  const loadStatistics = async () => {
+  const [manualStartDate, setManualStartDate] = useState("");
+  const [manualEndDate, setManualEndDate] = useState("");
+
+  const formatCurrency = (value: number) =>
+    `${Number(value || 0).toLocaleString("vi-VN")}đ`;
+
+  const loadLatestAuto = async (period: "daily" | "weekly" | "monthly") => {
     try {
-      setLoading(true);
+      setLoadingAuto(true);
       setError("");
-      const params: any = { period };
-
-      // Add date filter if set
-      if (filterStartDate) params.startDate = filterStartDate;
-      if (filterEndDate) params.endDate = filterEndDate;
-
-      console.log("📊 Loading statistics with params:", params);
-      const data = await statisticsApi.list(params);
-      console.log("✅ Statistics loaded:", data);
-      console.log("📈 Total items:", data.length);
-
-      setStatistics(data);
+      const report = await statisticsApi.getLatest(period);
+      setAutoReport(report);
     } catch (err: any) {
-      setError(err.response?.data?.message || "Không thể tải dữ liệu");
-      console.error("❌ Error loading statistics:", err);
+      if (err?.response?.status === 404) {
+        setAutoReport(null);
+        setError(err.response?.data?.message || "Chưa có báo cáo cho kỳ này");
+      } else {
+        setAutoReport(null);
+        setError(err.response?.data?.message || "Không thể tải báo cáo");
+      }
     } finally {
-      setLoading(false);
+      setLoadingAuto(false);
+    }
+  };
+
+  const loadLatestManual = async () => {
+    try {
+      setLoadingManual(true);
+      setError("");
+      const report = await statisticsApi.getLatest("custom");
+      setManualReport(report);
+    } catch (err: any) {
+      if (err?.response?.status === 404) {
+        setManualReport(null);
+      } else {
+        setManualReport(null);
+        setError(
+          err.response?.data?.message || "Không thể tải báo cáo thủ công"
+        );
+      }
+    } finally {
+      setLoadingManual(false);
     }
   };
 
   useEffect(() => {
-    loadStatistics();
-  }, [period, filterStartDate, filterEndDate]);
+    loadLatestAuto(autoPeriod);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoPeriod]);
 
-  // Generate monthly report (last 30 days)
-  const handleGenerateMonthly = async () => {
-    try {
-      setGenerating(true);
-      setError("");
-      const result = await statisticsApi.createReport("monthly");
-      alert(
-        `Đã tạo báo cáo tháng thành công!\nTừ ${result.data.startDate} đến ${
-          result.data.endDate
-        }\nDoanh thu: ${result.data.totalRevenue.toLocaleString("vi-VN")}đ`
-      );
-      await loadStatistics();
-    } catch (err: any) {
-      if (err.response?.status === 409) {
-        alert("Báo cáo tháng cho khoảng thời gian này đã tồn tại!");
-      } else {
-        setError(err.response?.data?.message || "Không thể tạo báo cáo");
-      }
-      console.error("Error generating monthly report:", err);
-    } finally {
-      setGenerating(false);
+  useEffect(() => {
+    if (activeTab === "manual") {
+      loadLatestManual();
     }
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
 
-  // Generate weekly report (last 7 days)
-  const handleGenerateWeekly = async () => {
-    try {
-      setGenerating(true);
-      setError("");
-      const result = await statisticsApi.createReport("weekly");
-      alert(
-        `Đã tạo báo cáo tuần thành công!\nTừ ${result.data.startDate} đến ${
-          result.data.endDate
-        }\nDoanh thu: ${result.data.totalRevenue.toLocaleString("vi-VN")}đ`
-      );
-      await loadStatistics();
-    } catch (err: any) {
-      if (err.response?.status === 409) {
-        alert("Báo cáo tuần cho khoảng thời gian này đã tồn tại!");
-      } else {
-        setError(err.response?.data?.message || "Không thể tạo báo cáo");
-      }
-      console.error("Error generating weekly report:", err);
-    } finally {
-      setGenerating(false);
-    }
-  };
-
-  // Generate custom date range report
-  const handleGenerateRange = async () => {
-    if (!generateStartDate || !generateEndDate) {
-      alert("Vui lòng chọn khoảng thời gian!");
+  const handleCreateManualReport = async () => {
+    if (!manualStartDate || !manualEndDate) {
+      setError("Vui lòng chọn ngày bắt đầu và ngày kết thúc");
       return;
     }
 
     try {
-      setGenerating(true);
+      setCreatingManual(true);
       setError("");
-      const result = await statisticsApi.createReport(
-        "custom",
-        generateStartDate,
-        generateEndDate
+      const result = await statisticsApi.createManualReport(
+        manualStartDate,
+        manualEndDate
       );
-      alert(
-        `Đã tạo báo cáo tùy chỉnh thành công!\n` +
-          `Từ ${result.data.startDate} đến ${result.data.endDate}\n` +
-          `Doanh thu: ${result.data.totalRevenue.toLocaleString("vi-VN")}đ\n` +
-          `Số đơn: ${result.data.totalOrders}`
-      );
-      setShowGenerateDialog(false);
-      await loadStatistics();
+      setManualReport(result.data);
     } catch (err: any) {
-      if (err.response?.status === 409) {
-        alert("Báo cáo cho khoảng thời gian này đã tồn tại!");
+      if (err?.response?.status === 409) {
+        setError(err.response?.data?.message || "Báo cáo đã tồn tại");
       } else {
         setError(err.response?.data?.message || "Không thể tạo báo cáo");
       }
-      console.error("Error generating custom report:", err);
     } finally {
-      setGenerating(false);
+      setCreatingManual(false);
     }
   };
 
-  // Clear date filter
-  const handleClearFilter = () => {
-    setFilterStartDate("");
-    setFilterEndDate("");
-  };
+  const handleExportExcel = async () => {
+    if (!autoReport?.id) return;
+    try {
+      setError("");
+      const blob = await statisticsApi.downloadExcel(autoReport.id);
 
-  // Calculate aggregated totals from statistics
-  const totalRevenue = statistics.reduce(
-    (sum, stat) => sum + (stat.totalRevenue || 0),
-    0
-  );
-  const totalOrders = statistics.reduce(
-    (sum, stat) => sum + (stat.totalOrders || 0),
-    0
-  );
-  const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
-  const totalProductsSold = statistics.reduce(
-    (sum, stat) => sum + (stat.totalProductsSold || 0),
-    0
-  );
+      const fileName = `Bao_cao_${autoReport.id}.xlsx`;
+      const isTauri = Boolean(
+        (window as any).__TAURI_INTERNALS__ || (window as any).__TAURI__
+      );
 
-  // Log calculations for debugging
-  console.log("💰 Calculations:", {
-    totalRevenue,
-    totalOrders,
-    avgOrderValue,
-    totalProductsSold,
-    statisticsCount: statistics.length,
-  });
+      if (isTauri) {
+        // This project uses Tauri v2 plugins (not @tauri-apps/api/dialog or /fs).
+        const [{ save }, { writeFile }] = await Promise.all([
+          import("@tauri-apps/plugin-dialog"),
+          import("@tauri-apps/plugin-fs"),
+        ]);
 
-  // Prepare chart data - show weekly or monthly view based on period
-  const chartData: ChartData[] = (() => {
-    if (period === "weekly") {
-      // Show full week Monday to Sunday
-      const days = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"];
-      const weekData: ChartData[] = days.map((dayLabel) => ({
-        day: dayLabel,
-        sales: 0,
-        count: 0,
-      }));
+        const filePath = await save({
+          defaultPath: fileName,
+          filters: [{ name: "Excel", extensions: ["xlsx"] }],
+        });
 
-      // Use dailyBreakdown data from statistics for accurate daily values
-      statistics.forEach((stat) => {
-        if (stat.dailyBreakdown && stat.dailyBreakdown.length > 0) {
-          // Use actual daily breakdown data
-          stat.dailyBreakdown.forEach((dailyData) => {
-            // Map dayOfWeek to array index: Monday=0, ..., Sunday=6
-            // dayOfWeek: 0=Sunday, 1=Monday, ..., 6=Saturday
-            let dayIndex: number;
-            if (dailyData.dayOfWeek === 0) {
-              dayIndex = 6; // Sunday -> CN (index 6)
-            } else {
-              dayIndex = dailyData.dayOfWeek - 1; // Monday=0, Tuesday=1, etc.
-            }
+        if (!filePath) return;
 
-            weekData[dayIndex].sales += dailyData.revenue;
-            weekData[dayIndex].count += dailyData.orders;
-          });
-        } else if (stat.period === "weekly") {
-          // Fallback for old reports without dailyBreakdown
-          const dailyAvg = stat.totalRevenue / 7;
-          const ordersAvg = stat.totalOrders / 7;
-          weekData.forEach((day) => {
-            day.sales += dailyAvg;
-            day.count += ordersAvg;
-          });
+        const buffer = await blob.arrayBuffer();
+        try {
+          await writeFile(filePath, new Uint8Array(buffer));
+        } catch (writeErr) {
+          console.error("Failed to write file via Tauri fs:", writeErr);
+          throw writeErr;
         }
-      });
 
-      return weekData;
-    } else {
-      // Show full 12 months
-      const monthData: ChartData[] = Array.from({ length: 12 }, (_, i) => ({
-        day: `T${i + 1}`,
-        sales: 0,
-        count: 0,
-      }));
+        return;
+      }
 
-      // Map statistics to correct month
-      statistics.forEach((stat) => {
-        if (stat.startDate) {
-          const date = new Date(stat.startDate);
-          const monthIndex = date.getMonth(); // 0-11
-
-          // Aggregate all revenue/orders for this month
-          monthData[monthIndex].sales += stat.totalRevenue;
-          monthData[monthIndex].count += stat.totalOrders;
-        }
-      });
-
-      return monthData;
+      // Browser fallback
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.style.display = "none";
+      link.href = url;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      window.setTimeout(() => {
+        link.remove();
+        window.URL.revokeObjectURL(url);
+      }, 0);
+    } catch (err: any) {
+      setError(err.response?.data?.message || "Không thể xuất file Excel");
     }
-  })();
-
-  // Aggregate top products across all statistics
-  const getTopProducts = () => {
-    const productMap = new Map<
-      string,
-      { name: string; quantity: number; revenue: number }
-    >();
-
-    statistics.forEach((stat) => {
-      stat.topProducts.forEach((product) => {
-        const existing = productMap.get(product.itemId);
-        if (existing) {
-          existing.quantity += product.totalQuantity;
-          existing.revenue += product.totalRevenue;
-        } else {
-          productMap.set(product.itemId, {
-            name: product.itemName,
-            quantity: product.totalQuantity,
-            revenue: product.totalRevenue,
-          });
-        }
-      });
-    });
-
-    return Array.from(productMap.values())
-      .sort((a, b) => b.quantity - a.quantity)
-      .slice(0, 8)
-      .map((product, index) => ({
-        name: product.name,
-        value: product.quantity,
-        revenue: product.revenue,
-        color: COLORS[index],
-      }));
   };
 
-  const topProducts = getTopProducts();
-  const top3Products = topProducts.slice(0, 3);
+  const reportToShow = activeTab === "auto" ? autoReport : manualReport;
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <Loader2 className="h-8 w-8 text-orange-600 animate-spin" />
-      </div>
-    );
-  }
+  const summary = useMemo(() => {
+    if (!reportToShow) {
+      return {
+        totalRevenue: 0,
+        totalOrders: 0,
+        averageOrderValue: 0,
+        totalProductsSold: 0,
+      };
+    }
+    return {
+      totalRevenue: Number(reportToShow.totalRevenue || 0),
+      totalOrders: Number(reportToShow.totalOrders || 0),
+      averageOrderValue: Number(reportToShow.averageOrderValue || 0),
+      totalProductsSold: Number(reportToShow.totalProductsSold || 0),
+    };
+  }, [reportToShow]);
 
-  if (error) {
-    return (
-      <div className="space-y-4">
-        <div className="p-4 bg-red-50 border-2 border-red-200 rounded-xl">
-          <p className="text-red-600">{error}</p>
-        </div>
-        <Button
-          onClick={loadStatistics}
-          className="bg-gradient-to-r from-orange-500 to-amber-600 text-white rounded-xl"
-        >
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Thử lại
-        </Button>
-      </div>
+  const chartData: ChartData[] = useMemo(() => {
+    const breakdown = reportToShow?.dailyBreakdown || [];
+    const weekdayLabel: Record<number, string> = {
+      1: "T2",
+      2: "T3",
+      3: "T4",
+      4: "T5",
+      5: "T6",
+      6: "T7",
+      0: "CN",
+    };
+
+    const sorted = [...breakdown].sort((a, b) => a.date.localeCompare(b.date));
+    return sorted.map((d) => ({
+      day:
+        reportToShow?.period === "weekly"
+          ? weekdayLabel[d.dayOfWeek] ?? d.dayName ?? d.date
+          : d.date,
+      sales: Number(d.revenue || 0),
+      count: Number(d.orders || 0),
+    }));
+  }, [reportToShow]);
+
+  const topProductsList = useMemo(() => {
+    const items = reportToShow?.topProducts || [];
+    const sorted = [...items].sort(
+      (a, b) => Number(b.totalRevenue || 0) - Number(a.totalRevenue || 0)
     );
-  }
+    const maxRevenue = Math.max(
+      1,
+      ...sorted.map((p) => Number(p.totalRevenue || 0))
+    );
+
+    return sorted.map((p) => ({
+      ...p,
+      percent: Math.round((Number(p.totalRevenue || 0) / maxRevenue) * 100),
+    }));
+  }, [reportToShow]);
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <div>
-          <h2 className="text-amber-900 mb-1">Báo cáo doanh thu</h2>
-          <p className="text-amber-700/70">Tổng quan hiệu suất kinh doanh</p>
+      <div>
+        <h2 className="text-amber-900 mb-1">Báo cáo thống kê</h2>
+        <p className="text-amber-700/70">
+          Cho admin xem báo cáo theo ngày/tuần/tháng (hiển thị gần nhất), tạo
+          báo cáo thủ công theo khoảng thời gian.
+        </p>
+      </div>
+
+      {error ? (
+        <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm">
+          {error}
         </div>
-        <div className="flex gap-2 flex-wrap">
-          <Button
-            onClick={() => setPeriod("weekly")}
-            className={`h-11 px-6 rounded-xl transition-all ${
-              period === "weekly"
-                ? "bg-gradient-to-r from-orange-500 to-amber-600 text-white"
-                : "bg-white text-amber-900 border-2 border-orange-200"
-            }`}
-          >
-            <Calendar className="h-4 w-4 mr-2" />
-            Theo tuần
-          </Button>
-          <Button
-            onClick={() => setPeriod("monthly")}
-            className={`h-11 px-6 rounded-xl transition-all ${
-              period === "monthly"
-                ? "bg-gradient-to-r from-orange-500 to-amber-600 text-white"
-                : "bg-white text-amber-900 border-2 border-orange-200"
-            }`}
-          >
-            <Calendar className="h-4 w-4 mr-2" />
-            Theo tháng
-          </Button>
-          {/* Reports Dropdown Menu */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button className="h-11 px-6 rounded-xl bg-gradient-to-r from-orange-500 to-amber-600 text-white hover:from-orange-600 hover:to-amber-700">
-                <FileText className="h-4 w-4 mr-2" />
-                Báo cáo
-                <ChevronDown className="h-4 w-4 ml-2" />
+      ) : null}
+
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
+        <TabsList>
+          <TabsTrigger value="auto">Theo kỳ</TabsTrigger>
+          <TabsTrigger value="manual">Thủ công</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="auto" className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Button
+                variant={autoPeriod === "daily" ? "default" : "outline"}
+                onClick={() => setAutoPeriod("daily")}
+              >
+                Ngày
               </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent
-              align="end"
-              className="w-56 rounded-xl border-2 border-orange-100"
-            >
-              <DropdownMenuItem
-                onClick={handleGenerateWeekly}
-                disabled={generating}
-                className="cursor-pointer focus:bg-orange-50 hover:bg-orange-50 transition-colors"
+              <Button
+                variant={autoPeriod === "weekly" ? "default" : "outline"}
+                onClick={() => setAutoPeriod("weekly")}
               >
-                {generating ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <FileText className="h-4 w-4 mr-2" />
-                )}
-                <span>Tạo báo cáo tuần (7 ngày)</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={handleGenerateMonthly}
-                disabled={generating}
-                className="cursor-pointer focus:bg-orange-50 hover:bg-orange-50 transition-colors"
+                Tuần
+              </Button>
+              <Button
+                variant={autoPeriod === "monthly" ? "default" : "outline"}
+                onClick={() => setAutoPeriod("monthly")}
               >
-                {generating ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <FileText className="h-4 w-4 mr-2" />
-                )}
-                <span>Tạo báo cáo tháng (30 ngày)</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => setShowGenerateDialog(true)}
-                className="cursor-pointer focus:bg-orange-50 hover:bg-orange-50 transition-colors"
+                Tháng
+              </Button>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                onClick={() => loadLatestAuto(autoPeriod)}
+                disabled={loadingAuto}
               >
-                <FileText className="h-4 w-4 mr-2" />
-                <span>Tạo báo cáo tùy chỉnh</span>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator className="bg-orange-100" />
-              <DropdownMenuItem
-                onClick={() => setShowReportsList(true)}
-                className="cursor-pointer focus:bg-orange-50 hover:bg-orange-50 transition-colors"
+                <RefreshCw
+                  className={`h-4 w-4 ${loadingAuto ? "animate-spin" : ""}`}
+                />
+              </Button>
+              <Button
+                onClick={handleExportExcel}
+                disabled={!autoReport?.id || loadingAuto}
               >
-                <FileText className="h-4 w-4 mr-2" />
-                <span>Xem danh sách báo cáo</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          {/* Refresh Button */}
-          <Button
-            onClick={loadStatistics}
-            className="h-11 px-6 rounded-xl bg-white text-amber-900 border-2 border-orange-200 hover:bg-orange-50"
-          >
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Làm mới
-          </Button>
-        </div>
-      </div>
-
-      {/* Generate Custom Report Dialog */}
-      <Dialog open={showGenerateDialog} onOpenChange={setShowGenerateDialog}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-amber-900">
-              Tạo báo cáo theo khoảng thời gian
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="generateStartDate" className="text-amber-900">
-                Ngày bắt đầu
-              </Label>
-              <Input
-                id="generateStartDate"
-                type="date"
-                value={generateStartDate}
-                onChange={(e) => setGenerateStartDate(e.target.value)}
-                className="mt-1 border-orange-200 rounded-xl"
-              />
+                <FileText className="mr-2 h-4 w-4" />
+                Xuất Excel
+              </Button>
             </div>
-            <div>
-              <Label htmlFor="generateEndDate" className="text-amber-900">
-                Ngày kết thúc
-              </Label>
-              <Input
-                id="generateEndDate"
-                type="date"
-                value={generateEndDate}
-                onChange={(e) => setGenerateEndDate(e.target.value)}
-                className="mt-1 border-orange-200 rounded-xl"
-              />
-            </div>
-            <Button
-              onClick={handleGenerateRange}
-              disabled={generating}
-              className="w-full h-11 bg-gradient-to-r from-orange-500 to-amber-600 text-white rounded-xl"
-            >
-              {generating ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Đang tạo...
-                </>
-              ) : (
-                <>
-                  <FileText className="h-4 w-4 mr-2" />
-                  Tạo báo cáo
-                </>
-              )}
-            </Button>
           </div>
-        </DialogContent>
-      </Dialog>
 
-      {/* View Reports Dialog */}
-      <Dialog open={showReportsList} onOpenChange={setShowReportsList}>
-        <DialogContent
-          className="!w-[95vw] !max-w-[1400px] !h-[90vh] !max-h-[90vh] p-0 overflow-hidden"
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            width: "95vw",
-            maxWidth: "1400px",
-            height: "90vh",
-            maxHeight: "90vh",
-          }}
-        >
-          <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0 border-b">
-            <DialogTitle className="text-amber-900">
-              Danh sách báo cáo đã tạo
-            </DialogTitle>
-          </DialogHeader>
-          <div className="flex-1 overflow-y-auto min-h-0 px-6 py-4">
-            {statistics.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full text-center py-12">
-                <FileText className="h-12 w-12 text-amber-600/30 mb-3" />
-                <p className="text-amber-600">Chưa có báo cáo nào</p>
-                <p className="text-amber-700/70 text-sm mt-2">
-                  Sử dụng menu "Báo cáo" để tạo báo cáo tuần, tháng hoặc tùy
-                  chỉnh
-                </p>
-              </div>
-            ) : (
-              <>
-                <div className="mb-4 p-4 bg-orange-50 rounded-xl border border-orange-200">
-                  <p className="text-amber-900 font-medium">
-                    Tổng số báo cáo: {statistics.length}
-                  </p>
-                  {filterStartDate && filterEndDate && (
-                    <p className="text-amber-700 text-sm mt-1">
-                      Lọc: Từ {filterStartDate} đến {filterEndDate}
-                    </p>
-                  )}
+          {loadingAuto ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Đang tải báo cáo...
+            </div>
+          ) : null}
+
+          {autoReport ? (
+            <Card className="p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="space-y-1">
+                  <div className="text-sm text-muted-foreground">
+                    Báo cáo đang hiển thị
+                  </div>
+                  <div className="font-medium">
+                    {(autoReport.startDate || "-") +
+                      " → " +
+                      (autoReport.endDate || "-")}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    ID: {autoReport.id}
+                  </div>
                 </div>
-                <div className="grid gap-4">
-                  {statistics.map((stat) => (
-                    <Card
-                      key={stat.id}
-                      className="p-4 border-2 border-orange-100 hover:shadow-lg transition-all"
-                    >
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
-                            <Calendar className="h-4 w-4 text-orange-600" />
-                            <span className="font-semibold text-amber-900">
-                              {stat.startDate && stat.endDate
-                                ? `${new Date(
-                                    stat.startDate
-                                  ).toLocaleDateString("vi-VN")} - ${new Date(
-                                    stat.endDate
-                                  ).toLocaleDateString("vi-VN")}`
-                                : new Date(stat.date).toLocaleDateString(
-                                    "vi-VN"
-                                  )}
-                            </span>
-                            <span className="px-2 py-1 bg-orange-100 text-orange-700 text-xs rounded-full">
-                              {stat.period === "weekly"
-                                ? "Tuần"
-                                : stat.period === "monthly"
-                                ? "Tháng"
-                                : stat.period === "custom"
-                                ? "Tùy chỉnh"
-                                : "Ngày"}
-                            </span>
-                          </div>
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-3">
-                            <div>
-                              <p className="text-xs text-amber-700/70">
-                                Doanh thu
-                              </p>
-                              <p className="font-semibold text-orange-600">
-                                {stat.totalRevenue.toLocaleString("vi-VN")}đ
-                              </p>
-                            </div>
-                            <div>
-                              <p className="text-xs text-amber-700/70">
-                                Đơn hàng
-                              </p>
-                              <p className="font-semibold text-orange-600">
-                                {stat.totalOrders}
-                              </p>
-                            </div>
-                            <div>
-                              <p className="text-xs text-amber-700/70">
-                                TB/đơn
-                              </p>
-                              <p className="font-semibold text-orange-600">
-                                {stat.averageOrderValue.toLocaleString(
-                                  "vi-VN",
-                                  {
-                                    maximumFractionDigits: 0,
-                                  }
-                                )}
-                                đ
-                              </p>
-                            </div>
-                            <div>
-                              <p className="text-xs text-amber-700/70">
-                                SP đã bán
-                              </p>
-                              <p className="font-semibold text-orange-600">
-                                {stat.totalProductsSold}
-                              </p>
-                            </div>
-                          </div>
-                          {stat.topProducts && stat.topProducts.length > 0 && (
-                            <div className="mt-3 pt-3 border-t border-orange-100">
-                              <p className="text-xs text-amber-700/70 mb-2">
-                                Top sản phẩm:
-                              </p>
-                              <div className="flex flex-wrap gap-2">
-                                {stat.topProducts
-                                  .slice(0, 3)
-                                  .map((product, idx) => (
-                                    <span
-                                      key={idx}
-                                      className="px-2 py-1 bg-amber-50 text-amber-800 text-xs rounded-lg"
-                                    >
-                                      {product.itemName} (
-                                      {product.totalQuantity})
-                                    </span>
-                                  ))}
-                              </div>
-                            </div>
-                          )}
-                          {stat.dailyBreakdown &&
-                            stat.dailyBreakdown.length > 0 && (
-                              <div className="mt-3 pt-3 border-t border-orange-100">
-                                <p className="text-xs text-amber-700/70 mb-2">
-                                  Chi tiết theo ngày:
-                                </p>
-                                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2 text-xs">
-                                  {stat.dailyBreakdown.map((day, idx) => (
-                                    <div
-                                      key={idx}
-                                      className="p-2 bg-orange-50 rounded-lg"
-                                    >
-                                      <p className="font-medium text-orange-700">
-                                        {day.dayName}
-                                      </p>
-                                      <p className="text-amber-700/70 text-[10px]">
-                                        {new Date(day.date).toLocaleDateString(
-                                          "vi-VN",
-                                          {
-                                            day: "2-digit",
-                                            month: "2-digit",
-                                          }
-                                        )}
-                                      </p>
-                                      <p className="font-semibold text-orange-600 mt-1">
-                                        {day.revenue.toLocaleString("vi-VN")}đ
-                                      </p>
-                                      <p className="text-amber-700/70">
-                                        {day.orders} đơn
-                                      </p>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-                        </div>
-                      </div>
-                    </Card>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Date Filter */}
-      <Card className="p-4 rounded-2xl border-2 border-orange-100">
-        <div className="flex items-end gap-4 flex-wrap">
-          <div className="flex-1 min-w-[200px]">
-            <Label htmlFor="filterStartDate" className="text-amber-900">
-              Từ ngày
-            </Label>
-            <Input
-              id="filterStartDate"
-              type="date"
-              value={filterStartDate}
-              onChange={(e) => setFilterStartDate(e.target.value)}
-              className="mt-1 border-orange-200 rounded-xl"
-            />
-          </div>
-          <div className="flex-1 min-w-[200px]">
-            <Label htmlFor="filterEndDate" className="text-amber-900">
-              Đến ngày
-            </Label>
-            <Input
-              id="filterEndDate"
-              type="date"
-              value={filterEndDate}
-              onChange={(e) => setFilterEndDate(e.target.value)}
-              className="mt-1 border-orange-200 rounded-xl"
-            />
-          </div>
-          <Button
-            onClick={handleClearFilter}
-            variant="outline"
-            className="h-11 px-6 rounded-xl border-2 border-orange-200 text-amber-900"
-          >
-            Xóa lọc
-          </Button>
-          <div className="text-sm text-amber-700/70">
-            {statistics.length > 0 && (
-              <span>Hiển thị {statistics.length} báo cáo</span>
-            )}
-          </div>
-        </div>
-      </Card>
-
-      {/* KPIs */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="p-6 rounded-2xl border-2 border-orange-100 hover:shadow-lg transition-shadow">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-amber-700/70 mb-1">Tổng doanh thu</p>
-              <p className="text-orange-600 mb-1">
-                {totalRevenue.toLocaleString("vi-VN")}đ
-              </p>
-              <div className="flex items-center gap-1 text-green-600">
-                <TrendingUp className="h-4 w-4" />
-                <span className="text-sm">Đã thanh toán</span>
-              </div>
-            </div>
-            <div className="p-3 bg-gradient-to-br from-orange-100 to-amber-100 rounded-xl">
-              <DollarSign className="h-6 w-6 text-orange-600" />
-            </div>
-          </div>
-        </Card>
-
-        <Card className="p-6 rounded-2xl border-2 border-orange-100 hover:shadow-lg transition-shadow">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-amber-700/70 mb-1">Tổng đơn hàng</p>
-              <p className="text-orange-600 mb-1">{totalOrders}</p>
-              <div className="flex items-center gap-1 text-green-600">
-                <TrendingUp className="h-4 w-4" />
-                <span className="text-sm">Hoàn thành</span>
-              </div>
-            </div>
-            <div className="p-3 bg-gradient-to-br from-orange-100 to-amber-100 rounded-xl">
-              <ShoppingBag className="h-6 w-6 text-orange-600" />
-            </div>
-          </div>
-        </Card>
-
-        <Card className="p-6 rounded-2xl border-2 border-orange-100 hover:shadow-lg transition-shadow">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-amber-700/70 mb-1">Giá trị TB/đơn</p>
-              <p className="text-orange-600 mb-1">
-                {avgOrderValue.toLocaleString("vi-VN", {
-                  maximumFractionDigits: 0,
-                })}
-                đ
-              </p>
-              <div className="flex items-center gap-1 text-green-600">
-                <TrendingUp className="h-4 w-4" />
-                <span className="text-sm">Trung bình</span>
-              </div>
-            </div>
-            <div className="p-3 bg-gradient-to-br from-orange-100 to-amber-100 rounded-xl">
-              <TrendingUp className="h-6 w-6 text-orange-600" />
-            </div>
-          </div>
-        </Card>
-
-        <Card className="p-6 rounded-2xl border-2 border-orange-100 hover:shadow-lg transition-shadow">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-amber-700/70 mb-1">Sản phẩm đã bán</p>
-              <p className="text-orange-600 mb-1">{totalProductsSold}</p>
-              <div className="flex items-center gap-1 text-green-600">
-                <TrendingUp className="h-4 w-4" />
-                <span className="text-sm">Tổng số lượng</span>
-              </div>
-            </div>
-            <div className="p-3 bg-gradient-to-br from-orange-100 to-amber-100 rounded-xl">
-              <ShoppingBag className="h-6 w-6 text-orange-600" />
-            </div>
-          </div>
-        </Card>
-      </div>
-
-      {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Sales Chart */}
-        <Card className="p-6 rounded-2xl border-2 border-orange-100">
-          <div className="mb-4">
-            <h3 className="text-amber-900 mb-1">
-              {period === "weekly"
-                ? "Doanh thu theo tuần"
-                : "Doanh thu theo tháng"}
-            </h3>
-            <p className="text-amber-700/70">
-              {period === "weekly" ? "Dữ liệu theo tuần" : "Dữ liệu theo tháng"}
-            </p>
-          </div>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#fed7aa" />
-              <XAxis dataKey="day" stroke="#92400e" />
-              <YAxis stroke="#92400e" />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "#fff",
-                  border: "2px solid #fed7aa",
-                  borderRadius: "12px",
-                }}
-                formatter={(value: number) =>
-                  `${value.toLocaleString("vi-VN")}đ`
-                }
-              />
-              <Bar
-                dataKey="sales"
-                fill="url(#colorGradient)"
-                radius={[8, 8, 0, 0]}
-              />
-              <defs>
-                <linearGradient id="colorGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#f97316" />
-                  <stop offset="100%" stopColor="#d97706" />
-                </linearGradient>
-              </defs>
-            </BarChart>
-          </ResponsiveContainer>
-        </Card>
-
-        {/* Product Distribution */}
-        <Card className="p-6 rounded-2xl border-2 border-orange-100">
-          <div className="mb-4">
-            <h3 className="text-amber-900 mb-1">Sản phẩm bán chạy</h3>
-            <p className="text-amber-700/70">Phân bố theo sản phẩm</p>
-          </div>
-          {topProducts.length > 0 ? (
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={topProducts}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ name, percent }) =>
-                    `${name} ${(percent * 100).toFixed(0)}%`
-                  }
-                  outerRadius={100}
-                  fill="#8884d8"
-                  dataKey="value"
-                >
-                  {topProducts.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip formatter={(value: number) => `${value} sản phẩm`} />
-              </PieChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="flex items-center justify-center h-[300px] text-amber-700/70">
-              Chưa có dữ liệu sản phẩm
-            </div>
-          )}
-        </Card>
-      </div>
-
-      {/* Top Products */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {top3Products.length > 0 ? (
-          top3Products.map((product, index) => (
-            <Card
-              key={index}
-              className="p-6 rounded-2xl border-2 border-orange-100"
-            >
-              <div className="flex items-center gap-3 mb-3">
-                <div
-                  className={`w-10 h-10 rounded-xl flex items-center justify-center text-white ${
-                    index === 0
-                      ? "bg-gradient-to-br from-orange-500 to-amber-600"
-                      : index === 1
-                      ? "bg-gradient-to-br from-orange-400 to-amber-500"
-                      : "bg-gradient-to-br from-orange-300 to-amber-400"
-                  }`}
-                >
-                  {index + 1}
-                </div>
-                <div>
-                  <h4 className="text-amber-900">{product.name}</h4>
-                  <p className="text-amber-700/70">
-                    {index === 0
-                      ? "Bán chạy nhất"
-                      : index === 1
-                      ? "Phổ biến"
-                      : "Top 3"}
-                  </p>
-                </div>
-              </div>
-              <div className="space-y-1">
-                <div className="flex justify-between text-amber-900">
-                  <span>Đã bán:</span>
-                  <span>{product.value} sản phẩm</span>
-                </div>
-                <div className="flex justify-between text-orange-600">
-                  <span>Doanh thu:</span>
-                  <span>{product.revenue.toLocaleString("vi-VN")}đ</span>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Calendar className="h-4 w-4" />
+                  Ngày tạo: {autoReport.date}
                 </div>
               </div>
             </Card>
-          ))
-        ) : (
-          <Card className="p-6 rounded-2xl border-2 border-orange-100 col-span-3">
-            <p className="text-amber-700/70 text-center">
-              Chưa có dữ liệu sản phẩm bán chạy
-            </p>
+          ) : (
+            <Card className="p-4">
+              <div className="text-sm text-muted-foreground">
+                Chưa có báo cáo cho kỳ này.
+              </div>
+            </Card>
+          )}
+        </TabsContent>
+
+        <TabsContent value="manual" className="space-y-4">
+          <Card className="p-4">
+            <div className="space-y-3">
+              <div className="font-medium">Tạo báo cáo thủ công</div>
+
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <div className="space-y-1">
+                  <Label htmlFor="manualStart">Ngày bắt đầu</Label>
+                  <Input
+                    id="manualStart"
+                    type="date"
+                    value={manualStartDate}
+                    onChange={(e) => setManualStartDate(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="manualEnd">Ngày kết thúc</Label>
+                  <Input
+                    id="manualEnd"
+                    type="date"
+                    value={manualEndDate}
+                    onChange={(e) => setManualEndDate(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Button
+                  onClick={handleCreateManualReport}
+                  disabled={creatingManual}
+                >
+                  {creatingManual ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : null}
+                  Tạo báo cáo
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={loadLatestManual}
+                  disabled={loadingManual}
+                >
+                  <RefreshCw
+                    className={`h-4 w-4 ${loadingManual ? "animate-spin" : ""}`}
+                  />
+                </Button>
+              </div>
+            </div>
           </Card>
-        )}
-      </div>
+
+          {loadingManual ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Đang tải báo cáo thủ công...
+            </div>
+          ) : null}
+
+          {manualReport ? (
+            <Card className="p-4">
+              <div className="space-y-1">
+                <div className="text-sm text-muted-foreground">
+                  Báo cáo thủ công gần nhất
+                </div>
+                <div className="font-medium">
+                  {(manualReport.startDate || "-") +
+                    " → " +
+                    (manualReport.endDate || "-")}
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  ID: {manualReport.id}
+                </div>
+              </div>
+            </Card>
+          ) : (
+            <Card className="p-4">
+              <div className="text-sm text-muted-foreground">
+                Chưa có báo cáo thủ công.
+              </div>
+            </Card>
+          )}
+        </TabsContent>
+      </Tabs>
+
+      {reportToShow ? (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <Card className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Tổng doanh thu</p>
+                <p className="text-2xl font-bold">
+                  {formatCurrency(summary.totalRevenue)}
+                </p>
+              </div>
+              <DollarSign className="h-8 w-8 text-muted-foreground" />
+            </div>
+          </Card>
+
+          <Card className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Tổng số đơn</p>
+                <p className="text-2xl font-bold">{summary.totalOrders}</p>
+              </div>
+              <ShoppingBag className="h-8 w-8 text-muted-foreground" />
+            </div>
+          </Card>
+
+          <Card className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Giá trị đơn TB</p>
+                <p className="text-2xl font-bold">
+                  {formatCurrency(summary.averageOrderValue)}
+                </p>
+              </div>
+              <DollarSign className="h-8 w-8 text-muted-foreground" />
+            </div>
+          </Card>
+
+          <Card className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Sản phẩm bán ra</p>
+                <p className="text-2xl font-bold">
+                  {summary.totalProductsSold}
+                </p>
+              </div>
+              <ShoppingBag className="h-8 w-8 text-muted-foreground" />
+            </div>
+          </Card>
+        </div>
+      ) : null}
+
+      {reportToShow ? (
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <Card className="p-4">
+            <div className="mb-3 font-medium">Doanh thu theo ngày</div>
+            {chartData.length ? (
+              <div className="h-[280px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={chartData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="day" />
+                    <YAxis />
+                    <Tooltip
+                      formatter={(value: any, name: any) => {
+                        if (name === "sales")
+                          return [formatCurrency(value), "Doanh thu"];
+                        return [value, "Số đơn"];
+                      }}
+                    />
+                    <Bar dataKey="sales" fill={COLORS[2]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <div className="text-sm text-muted-foreground">
+                Không có dữ liệu chi tiết theo ngày
+              </div>
+            )}
+          </Card>
+
+          <Card className="p-4">
+            <div className="mb-3 font-medium">Top sản phẩm</div>
+            {topProductsList.length ? (
+              <div className="space-y-4">
+                {topProductsList.map((p, idx) => (
+                  <div key={p.itemId} className="space-y-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-8 h-8 rounded-xl bg-orange-50 flex items-center justify-center text-amber-900 font-semibold flex-shrink-0">
+                          {idx + 1}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="font-medium truncate">
+                            {p.itemName}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            Đã bán: {p.totalQuantity}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-sm font-semibold flex-shrink-0">
+                        {formatCurrency(Number(p.totalRevenue || 0))}
+                      </div>
+                    </div>
+                    <div className="h-2 rounded-full bg-orange-100 overflow-hidden">
+                      <div
+                        className="h-full bg-orange-500"
+                        style={{ width: `${p.percent}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-sm text-muted-foreground">
+                Không có dữ liệu sản phẩm
+              </div>
+            )}
+          </Card>
+        </div>
+      ) : null}
     </div>
   );
 }

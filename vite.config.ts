@@ -54,6 +54,29 @@ export default defineConfig(async () => ({
   },
   build: {
     target: "esnext",
+    chunkSizeWarningLimit: 800,
+    rollupOptions: {
+      // Do not try to bundle Tauri native modules; they are provided at runtime
+      external: [
+        "@tauri-apps/api/dialog",
+        "@tauri-apps/api/fs",
+        "@tauri-apps/api",
+      ],
+      output: {
+        manualChunks(id) {
+          if (!id) return null;
+          // put node_modules into vendor chunk
+          if (id.includes("node_modules")) {
+            return "vendor";
+          }
+          // keep api client in separate chunk to avoid duplicating it
+          if (id.includes("/src/lib/api") || id.endsWith("/src/lib/api.ts")) {
+            return "api-client";
+          }
+          return null;
+        },
+      },
+    },
   },
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //

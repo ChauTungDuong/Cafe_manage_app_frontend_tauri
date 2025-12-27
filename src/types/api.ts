@@ -34,7 +34,6 @@ export interface Item {
   image?: string;
   imagePublicId?: string;
   status: "available" | "out of stock" | "discontinued";
-  amountLeft?: number;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -263,10 +262,7 @@ export interface CreateReportResponse {
   data: Statistic;
 }
 
-export type ReportType = "weekly" | "monthly" | "custom";
-
-export interface CreateReportRequest {
-  reportType: ReportType;
-  startDate?: string;
-  endDate?: string;
+export interface CreateManualReportRequest {
+  startDate: string;
+  endDate: string;
 }

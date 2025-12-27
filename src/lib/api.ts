@@ -409,8 +409,7 @@ import type {
   CreatePaymentDto,
   Statistic,
   CreateReportResponse,
-  CreateReportRequest,
-  ReportType,
+  CreateManualReportRequest,
 } from "../types/api";
 
 export const usersApi = {
@@ -850,37 +849,42 @@ export const statisticsApi = {
     endDate?: string;
     period?: "daily" | "weekly" | "monthly" | "custom";
   }): Promise<Statistic[]> => {
-    const queryParams = new URLSearchParams();
-    if (params?.startDate) queryParams.append("startDate", params.startDate);
-    if (params?.endDate) queryParams.append("endDate", params.endDate);
-    if (params?.period) queryParams.append("period", params.period);
+    const response = await api.get("/statistics", { params });
+    return response.data;
+  },
 
-    const url = queryParams.toString()
-      ? `/statistics/reports?${queryParams}`
-      : "/statistics/reports";
-    const response = await api.get(url);
+  // Get latest report by period (daily/weekly/monthly/custom)
+  getLatest: async (
+    period: "daily" | "weekly" | "monthly" | "custom"
+  ): Promise<Statistic> => {
+    const response = await api.get("/statistics/latest", {
+      params: { period },
+    });
     return response.data;
   },
 
   // Get report by ID
   getById: async (id: string): Promise<Statistic> => {
-    const response = await api.get(`/statistics/reports/${id}`);
+    const response = await api.get(`/statistics/${id}`);
     return response.data;
   },
 
-  // Create a new report
-  createReport: async (
-    reportType: ReportType,
-    startDate?: string,
-    endDate?: string
+  // Create manual (custom) report by date range
+  createManualReport: async (
+    startDate: string,
+    endDate: string
   ): Promise<CreateReportResponse> => {
-    const payload: CreateReportRequest = { reportType };
-    if (reportType === "custom" && startDate && endDate) {
-      payload.startDate = startDate;
-      payload.endDate = endDate;
-    }
-    const response = await api.post("/statistics/reports", payload);
+    const payload: CreateManualReportRequest = { startDate, endDate };
+    const response = await api.post("/statistics", payload);
     return response.data;
+  },
+
+  // Download excel for a report by id
+  downloadExcel: async (id: string): Promise<Blob> => {
+    const response = await api.get(`/statistics/${id}/excel`, {
+      responseType: "blob",
+    });
+    return response.data as Blob;
   },
 };
 

@@ -239,14 +239,7 @@ export function SalesPOS({ currentUser }: SalesPOSProps) {
       : items.filter((item) => item.category?.name === selectedCategory);
 
   const addToOrder = (item: Item) => {
-    // Check stock
-    const currentQuantity = order.find((o) => o.id === item.id)?.quantity || 0;
-    const available = item.amountLeft ?? 0;
-    if (currentQuantity >= available) {
-      toast.error(`Không đủ hàng! Còn lại: ${available}`);
-      return;
-    }
-
+    // Note: Ingredient availability will be checked on backend when creating order
     const existing = order.find((orderItem) => orderItem.id === item.id);
     if (existing) {
       setOrder(
@@ -266,12 +259,6 @@ export function SalesPOS({ currentUser }: SalesPOSProps) {
       order.map((item) => {
         if (item.id === id) {
           const newQuantity = Math.max(1, item.quantity + delta);
-          // Check stock limit
-          const available2 = item.amountLeft ?? 0;
-          if (newQuantity > available2) {
-            toast.error(`Không đủ hàng! Còn lại: ${available2}`);
-            return item;
-          }
           return { ...item, quantity: newQuantity };
         }
         return item;
