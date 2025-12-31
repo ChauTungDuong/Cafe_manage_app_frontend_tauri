@@ -93,12 +93,48 @@ export interface Payment {
 // Ingredient & Recipe types
 export type MeasureUnit = "g" | "kg" | "l" | "ml" | "pcs" | "tsp" | "tbsp";
 
+export type LogAction =
+  | "CREATE"
+  | "READ"
+  | "UPDATE"
+  | "DELETE"
+  | "IMPORT"
+  | "EXPORT"
+  | "LOGIN"
+  | "LOGOUT"
+  | "ERROR";
+
+export interface LogEntry {
+  id: string;
+  userId: string;
+  userName?: string;
+  userRole?: UserRole;
+  action: LogAction;
+  entityType: string;
+  entityId?: string;
+  entityName?: string;
+  message?: string;
+  metadata?: Record<string, any>;
+  createdAt: string;
+}
+
+export interface GetLogsResponse {
+  data: LogEntry[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
 export interface Ingredient {
   id: string;
   name: string;
   measureUnit: MeasureUnit;
   amountLeft: number;
   minAmount: number;
+  pricePerUnit?: {
+    price: number;
+    unit: MeasureUnit;
+  };
   image?: string;
   imagePublicId?: string;
   createdAt?: string;
@@ -156,8 +192,11 @@ export interface CreateTableDto {
 
 export interface CreateIngredientDto {
   name: string;
-  amountLeft: number;
   measureUnit: MeasureUnit;
+  pricePerUnit: {
+    price: number;
+    unit: MeasureUnit;
+  };
   minAmount?: number;
   image?: string;
   imagePublicId?: string;
@@ -166,8 +205,12 @@ export interface CreateIngredientDto {
 export interface BulkCreateIngredientsDto {
   ingredients: Array<{
     name: string;
-    amountLeft: number;
     measureUnit: MeasureUnit;
+    minAmount?: number;
+    pricePerUnit: {
+      price: number;
+      unit: MeasureUnit;
+    };
   }>;
 }
 
@@ -216,11 +259,30 @@ export interface CreatePaymentDto {
 
 export interface UpdateIngredientDto {
   name?: string;
-  amountLeft?: number;
   measureUnit?: MeasureUnit;
   minAmount?: number;
+  pricePerUnit?: {
+    price: number;
+    unit: MeasureUnit;
+  };
   image?: string;
   imagePublicId?: string;
+}
+
+export interface ImportIngredientDto {
+  ingredients: Array<{
+    ingredientId: string;
+    amount: number;
+    pricePerUnit?: number;
+    unit?: MeasureUnit;
+  }>;
+}
+
+export interface ExportIngredientDto {
+  ingredients: Array<{
+    ingredientId: string;
+    amount: number;
+  }>;
 }
 
 // ============ STATISTICS TYPES ============

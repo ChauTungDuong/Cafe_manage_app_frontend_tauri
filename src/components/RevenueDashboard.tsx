@@ -265,29 +265,67 @@ export function RevenueDashboard() {
       ) : null}
 
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
-        <TabsList>
-          <TabsTrigger value="auto">Theo kỳ</TabsTrigger>
-          <TabsTrigger value="manual">Thủ công</TabsTrigger>
+        <style>{`
+          .revenue-period-tabs [data-slot="tabs-trigger"][data-state="active"] {
+            background-color: rgb(249 115 22) !important;
+            color: white !important;
+            border-color: transparent !important;
+            font-weight: 600 !important;
+          }
+          .revenue-period-tabs [data-slot="tabs-trigger"][data-state="inactive"] {
+            background-color: white !important;
+            color: rgb(120 53 15) !important;
+          }
+        `}</style>
+
+        <TabsList className="revenue-period-tabs bg-orange-50 text-amber-900 border border-orange-100 rounded-xl">
+          <TabsTrigger
+            value="auto"
+            className="border-2 border-orange-200 bg-white text-amber-900 hover:bg-orange-50"
+          >
+            Theo kỳ
+          </TabsTrigger>
+          <TabsTrigger
+            value="manual"
+            className="border-2 border-orange-200 bg-white text-amber-900 hover:bg-orange-50"
+          >
+            Thủ công
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="auto" className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <Button
-                variant={autoPeriod === "daily" ? "default" : "outline"}
+                variant="outline"
                 onClick={() => setAutoPeriod("daily")}
+                className={
+                  autoPeriod === "daily"
+                    ? "bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white border-transparent"
+                    : "border-2 border-orange-200 hover:bg-orange-50 text-amber-900"
+                }
               >
                 Ngày
               </Button>
               <Button
-                variant={autoPeriod === "weekly" ? "default" : "outline"}
+                variant="outline"
                 onClick={() => setAutoPeriod("weekly")}
+                className={
+                  autoPeriod === "weekly"
+                    ? "bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white border-transparent"
+                    : "border-2 border-orange-200 hover:bg-orange-50 text-amber-900"
+                }
               >
                 Tuần
               </Button>
               <Button
-                variant={autoPeriod === "monthly" ? "default" : "outline"}
+                variant="outline"
                 onClick={() => setAutoPeriod("monthly")}
+                className={
+                  autoPeriod === "monthly"
+                    ? "bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white border-transparent"
+                    : "border-2 border-orange-200 hover:bg-orange-50 text-amber-900"
+                }
               >
                 Tháng
               </Button>
@@ -298,6 +336,7 @@ export function RevenueDashboard() {
                 variant="outline"
                 onClick={() => loadLatestAuto(autoPeriod)}
                 disabled={loadingAuto}
+                className="rounded-xl border-2 border-orange-200 hover:bg-orange-50"
               >
                 <RefreshCw
                   className={`h-4 w-4 ${loadingAuto ? "animate-spin" : ""}`}
@@ -306,6 +345,7 @@ export function RevenueDashboard() {
               <Button
                 onClick={handleExportExcel}
                 disabled={!autoReport?.id || loadingAuto}
+                className="bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white"
               >
                 <FileText className="mr-2 h-4 w-4" />
                 Xuất Excel
@@ -321,7 +361,7 @@ export function RevenueDashboard() {
           ) : null}
 
           {autoReport ? (
-            <Card className="p-4">
+            <Card className="p-4 border-2 border-orange-100 shadow-lg rounded-2xl">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="space-y-1">
                   <div className="text-sm text-muted-foreground">
@@ -343,7 +383,7 @@ export function RevenueDashboard() {
               </div>
             </Card>
           ) : (
-            <Card className="p-4">
+            <Card className="p-4 border-2 border-orange-100 shadow-lg rounded-2xl">
               <div className="text-sm text-muted-foreground">
                 Chưa có báo cáo cho kỳ này.
               </div>
@@ -352,7 +392,7 @@ export function RevenueDashboard() {
         </TabsContent>
 
         <TabsContent value="manual" className="space-y-4">
-          <Card className="p-4">
+          <Card className="p-4 border-2 border-orange-100 shadow-lg rounded-2xl">
             <div className="space-y-3">
               <div className="font-medium">Tạo báo cáo thủ công</div>
 
@@ -381,6 +421,7 @@ export function RevenueDashboard() {
                 <Button
                   onClick={handleCreateManualReport}
                   disabled={creatingManual}
+                  className="bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white"
                 >
                   {creatingManual ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -391,6 +432,7 @@ export function RevenueDashboard() {
                   variant="outline"
                   onClick={loadLatestManual}
                   disabled={loadingManual}
+                  className="rounded-xl border-2 border-orange-200 hover:bg-orange-50"
                 >
                   <RefreshCw
                     className={`h-4 w-4 ${loadingManual ? "animate-spin" : ""}`}
@@ -408,7 +450,7 @@ export function RevenueDashboard() {
           ) : null}
 
           {manualReport ? (
-            <Card className="p-4">
+            <Card className="p-4 border-2 border-orange-100 shadow-lg rounded-2xl">
               <div className="space-y-1">
                 <div className="text-sm text-muted-foreground">
                   Báo cáo thủ công gần nhất
@@ -424,7 +466,7 @@ export function RevenueDashboard() {
               </div>
             </Card>
           ) : (
-            <Card className="p-4">
+            <Card className="p-4 border-2 border-orange-100 shadow-lg rounded-2xl">
               <div className="text-sm text-muted-foreground">
                 Chưa có báo cáo thủ công.
               </div>
@@ -435,7 +477,7 @@ export function RevenueDashboard() {
 
       {reportToShow ? (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <Card className="p-4">
+          <Card className="p-4 border-2 border-orange-100 shadow-lg rounded-2xl">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Tổng doanh thu</p>
@@ -447,7 +489,7 @@ export function RevenueDashboard() {
             </div>
           </Card>
 
-          <Card className="p-4">
+          <Card className="p-4 border-2 border-orange-100 shadow-lg rounded-2xl">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Tổng số đơn</p>
@@ -457,7 +499,7 @@ export function RevenueDashboard() {
             </div>
           </Card>
 
-          <Card className="p-4">
+          <Card className="p-4 border-2 border-orange-100 shadow-lg rounded-2xl">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Giá trị đơn TB</p>
@@ -469,7 +511,7 @@ export function RevenueDashboard() {
             </div>
           </Card>
 
-          <Card className="p-4">
+          <Card className="p-4 border-2 border-orange-100 shadow-lg rounded-2xl">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Sản phẩm bán ra</p>
@@ -485,11 +527,11 @@ export function RevenueDashboard() {
 
       {reportToShow ? (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <Card className="p-4">
+          <Card className="p-4 border-2 border-orange-100 shadow-lg rounded-2xl">
             <div className="mb-3 font-medium">Doanh thu theo ngày</div>
             {chartData.length ? (
-              <div className="h-[280px]">
-                <ResponsiveContainer width="100%" height="100%">
+              <div className="w-full">
+                <ResponsiveContainer width="100%" height={280}>
                   <BarChart data={chartData}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="day" />
@@ -512,7 +554,7 @@ export function RevenueDashboard() {
             )}
           </Card>
 
-          <Card className="p-4">
+          <Card className="p-4 border-2 border-orange-100 shadow-lg rounded-2xl">
             <div className="mb-3 font-medium">Top sản phẩm</div>
             {topProductsList.length ? (
               <div className="space-y-4">

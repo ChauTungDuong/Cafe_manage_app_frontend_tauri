@@ -13,6 +13,7 @@ import { OrderHistory } from "./components/OrderHistory";
 import { Profile } from "./components/Profile";
 import { InventoryManagement } from "./components/InventoryManagement";
 import { TaxManagement } from "./components/TaxManagement";
+import { SystemLogs } from "./components/SystemLogs";
 import {
   ShoppingCart,
   UtensilsCrossed,
@@ -24,6 +25,7 @@ import {
   UserCircle,
   Package,
   Percent,
+  ScrollText,
   Menu,
   X,
 } from "lucide-react";
@@ -39,7 +41,8 @@ type AdminView =
   | "orders"
   | "profile"
   | "inventory"
-  | "taxes";
+  | "taxes"
+  | "logs";
 type StaffView =
   | "sales"
   | "menu"
@@ -180,6 +183,12 @@ export default function App() {
       icon: Receipt,
       label: "Quản lý hóa đơn",
       view: "orders" as AdminView,
+    },
+    {
+      id: "logs",
+      icon: ScrollText,
+      label: "Nhật ký hệ thống",
+      view: "logs" as AdminView,
     },
     {
       id: "profile",
@@ -338,6 +347,7 @@ export default function App() {
               {currentAdminView === "orders" && (
                 <OrderHistory currentUser={currentUser} />
               )}
+              {currentAdminView === "logs" && <SystemLogs />}
               {currentAdminView === "profile" && currentUser && (
                 <Profile user={currentUser} />
               )}

@@ -629,6 +629,12 @@ export const taxesApi = {
     return response.data;
   },
 
+  // Get active taxes/discounts list (ADMIN, STAFF)
+  listActive: async (): Promise<Tax[]> => {
+    const response = await api.get("/taxes/active/list");
+    return response.data;
+  },
+
   // Get tax by ID (ADMIN, STAFF)
   get: async (id: string): Promise<Tax> => {
     const response = await api.get(`/taxes/${id}`);
@@ -741,7 +747,27 @@ import type {
   Ingredient,
   CreateIngredientDto,
   BulkCreateIngredientsDto,
+  ImportIngredientDto,
+  ExportIngredientDto,
+  GetLogsResponse,
 } from "../types/api";
+
+export const logsApi = {
+  list: async (params?: {
+    page?: number;
+    limit?: number;
+    action?: string;
+    entityType?: string;
+    entityId?: string;
+    userId?: string;
+    q?: string;
+    from?: string;
+    to?: string;
+  }): Promise<GetLogsResponse> => {
+    const response = await api.get("/logs", { params });
+    return response.data;
+  },
+};
 
 export const ingredientsApi = {
   // Get all ingredients
@@ -788,6 +814,22 @@ export const ingredientsApi = {
           }
         : {};
     const response = await api.patch(`/ingredients/${id}`, dto, config);
+    return response.data;
+  },
+
+  // Import ingredient stock (ADMIN)
+  importStock: async (
+    dto: ImportIngredientDto
+  ): Promise<{ success: boolean; message: string }> => {
+    const response = await api.post("/ingredients/import", dto);
+    return response.data;
+  },
+
+  // Export ingredient stock (ADMIN)
+  exportStock: async (
+    dto: ExportIngredientDto
+  ): Promise<{ success: boolean; message: string }> => {
+    const response = await api.post("/ingredients/export", dto);
     return response.data;
   },
 
