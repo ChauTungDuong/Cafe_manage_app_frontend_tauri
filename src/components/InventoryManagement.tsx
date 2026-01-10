@@ -91,6 +91,16 @@ export function InventoryManagement({ currentUser }: InventoryManagementProps) {
   const [imagePreview, setImagePreview] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const formatVnd = (value: number) => {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return "—";
+    return new Intl.NumberFormat("vi-VN", {
+      style: "currency",
+      currency: "VND",
+      maximumFractionDigits: 0,
+    }).format(n);
+  };
+
   useEffect(() => {
     loadIngredients();
   }, []);
@@ -979,7 +989,7 @@ export function InventoryManagement({ currentUser }: InventoryManagementProps) {
                   Thêm nguyên liệu
                 </Button>
               </DialogTrigger>
-              <DialogContent className="sm:max-w-[520px] max-h-[80vh] overflow-y-auto">
+              <DialogContent className="w-[90vw] max-w-[700px] max-h-[85vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>
                     {editingIngredient
@@ -1299,6 +1309,18 @@ export function InventoryManagement({ currentUser }: InventoryManagementProps) {
                       style={{ height: "16px", lineHeight: "16px" }}
                     >
                       Tối thiểu: {ingredient.minAmount} {ingredient.measureUnit}
+                    </p>
+
+                    <p className="text-xs text-amber-700/80">
+                      Giá/đơn vị:{" "}
+                      <span className="font-semibold text-amber-900">
+                        {ingredient.pricePerUnit?.price === undefined
+                          ? "—"
+                          : formatVnd(ingredient.pricePerUnit.price)}
+                      </span>
+                      {ingredient.pricePerUnit?.unit
+                        ? ` / ${ingredient.pricePerUnit.unit}`
+                        : ""}
                     </p>
                   </div>
 

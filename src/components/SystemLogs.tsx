@@ -14,6 +14,7 @@ import { Loader2, RefreshCw, Search } from "lucide-react";
 import { logsApi } from "../lib/api";
 import type { GetLogsResponse, LogEntry } from "../types/api";
 import { toast } from "sonner";
+import { formatDateTimeUTC7 } from "../lib/datetime";
 
 export function SystemLogs() {
   const [isLoading, setIsLoading] = useState(false);
@@ -21,6 +22,8 @@ export function SystemLogs() {
   const [limit] = useState(20);
   const [q, setQ] = useState("");
   const [data, setData] = useState<GetLogsResponse | null>(null);
+
+  const formatLogTime = (value?: string | null) => formatDateTimeUTC7(value);
 
   const rows = useMemo<LogEntry[]>(() => data?.data ?? [], [data]);
   const total = data?.total ?? 0;
@@ -150,7 +153,7 @@ export function SystemLogs() {
                 rows.map((log) => (
                   <TableRow key={log.id}>
                     <TableCell className="text-center whitespace-nowrap w-[180px]">
-                      {new Date(log.createdAt).toLocaleString("vi-VN")}
+                      {formatLogTime(log.createdAt)}
                     </TableCell>
                     <TableCell className="text-center w-[220px]">
                       <div className="leading-tight">

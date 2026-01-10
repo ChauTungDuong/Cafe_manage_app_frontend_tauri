@@ -3,13 +3,20 @@ import { Store } from "@tauri-apps/plugin-store";
 
 // Đọc backend URL từ biến môi trường
 const BACKEND_URL =
-  import.meta.env.VITE_BACKEND_DOMAIN || "http://localhost:3000";
-const REFRESH_TOKEN_KEY = "refresh_token";
+  import.meta.env.VPS_BACKEND_DOMAIN || "http://localhost:3000";
+
+const REFRESH_TOKEN_KEY_PREFIX = "refresh_token:";
+const LAST_USER_ID_KEY = "last_user_id";
 
 // Debug logging
 console.log("🔧 API Config:");
 console.log("- BACKEND_URL:", BACKEND_URL);
 console.log("- VITE_BACKEND_DOMAIN:", import.meta.env.VITE_BACKEND_DOMAIN);
+console.log(
+  "- VITE_VPS_BACKEND_DOMAIN:",
+  import.meta.env.VITE_VPS_BACKEND_DOMAIN
+);
+console.log("- VPS_BACKEND_DOMAIN:", import.meta.env.VPS_BACKEND_DOMAIN);
 
 // Khởi tạo Tauri Store để lưu refresh token an toàn
 let store: Store | null = null;
@@ -23,27 +30,43 @@ export async function initStore() {
   }
 }
 
-// Lưu refresh token vào store
-async function saveRefreshToken(token: string) {
-  if (store) {
-    await store.set(REFRESH_TOKEN_KEY, token);
-    await store.save();
-  }
+async function setLastUserId(userId: string) {
+  if (!store) return;
+  await store.set(LAST_USER_ID_KEY, userId);
+  await store.save();
 }
 
-// Lấy refresh token từ store
-async function getRefreshToken(): Promise<string | null> {
-  if (store) {
-    const token = await store.get<string>(REFRESH_TOKEN_KEY);
-    return token ?? null;
-  }
-  return null;
+async function getLastUserId(): Promise<string | null> {
+  if (!store) return null;
+  const userId = await store.get<string>(LAST_USER_ID_KEY);
+  return userId ?? null;
 }
 
-// Xóa refresh token
-async function clearRefreshToken() {
-  if (store) {
-    await store.delete(REFRESH_TOKEN_KEY);
+async function clearLastUserId() {
+  if (!store) return;
+  await store.delete(LAST_USER_ID_KEY);
+  await store.save();
+}
+
+async function saveRefreshTokenForUser(userId: string, token: string) {
+  if (!store) return;
+  await store.set(`${REFRESH_TOKEN_KEY_PREFIX}${userId}`, token);
+  await setLastUserId(userId);
+}
+
+async function getRefreshTokenForUser(userId: string): Promise<string | null> {
+  if (!store) return null;
+  const token = await store.get<string>(`${REFRESH_TOKEN_KEY_PREFIX}${userId}`);
+  return token ?? null;
+}
+
+async function clearRefreshTokenForUser(userId: string) {
+  if (!store) return;
+  await store.delete(`${REFRESH_TOKEN_KEY_PREFIX}${userId}`);
+  const lastUserId = await getLastUserId();
+  if (lastUserId === userId) {
+    await clearLastUserId();
+  } else {
     await store.save();
   }
 }
@@ -207,7 +230,18 @@ api.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        const refreshToken = await getRefreshToken();
+        const lastUserId = await getLastUserId();
+        if (!lastUserId) {
+          console.log("No last user found - redirecting to login");
+          processQueue(new Error("No last user"), null);
+          await logout();
+          window.dispatchEvent(new CustomEvent("auth:logout"));
+          return Promise.reject(
+            new Error("No user to restore - please login again")
+          );
+        }
+
+        const refreshToken = await getRefreshTokenForUser(lastUserId);
         if (!refreshToken) {
           // Không có refresh token, logout và emit event để redirect về login
           console.log("No refresh token found - redirecting to login");
@@ -230,7 +264,7 @@ api.interceptors.response.use(
         // Lưu token mới
         setAccessToken(newAccessToken);
         if (newRefreshToken) {
-          await saveRefreshToken(newRefreshToken);
+          await saveRefreshTokenForUser(lastUserId, newRefreshToken);
         }
 
         // Cập nhật header và retry request
@@ -284,46 +318,66 @@ export const authApi = {
   // Đăng nhập
   async login(credentials: LoginRequest): Promise<LoginResponse> {
     const response = await api.post<LoginResponse>("/auth/login", credentials);
-    const { access_token, refresh_token } = response.data; // Backend trả về snake_case
+    const { access_token, refresh_token, user } = response.data; // Backend trả về snake_case
 
     // Lưu tokens
     setAccessToken(access_token);
-    await saveRefreshToken(refresh_token);
+    await saveRefreshTokenForUser(user.id, refresh_token);
 
     return response.data;
   },
 
   // Refresh token
-  async refresh(): Promise<{ access_token: string; refresh_token?: string }> {
-    const refreshToken = await getRefreshToken();
+  async refresh(options?: {
+    timeoutMs?: number;
+    userId?: string;
+  }): Promise<{ access_token: string; refresh_token?: string }> {
+    const userId = options?.userId ?? (await getLastUserId());
+    if (!userId) {
+      console.log("No last user found - cannot refresh");
+      throw new Error("No user - please login again");
+    }
+
+    const refreshToken = await getRefreshTokenForUser(userId);
     if (!refreshToken) {
       console.log("No refresh token found - cannot refresh");
       throw new Error("No refresh token - please login again");
     }
 
-    const response = await axios.post(`${BACKEND_URL}/auth/refresh`, {
-      refreshToken: refreshToken,
-    });
+    const response = await axios.post(
+      `${BACKEND_URL}/auth/refresh`,
+      {
+        refreshToken: refreshToken,
+      },
+      {
+        timeout: options?.timeoutMs,
+      }
+    );
 
     const { access_token, refresh_token: newRefreshToken } = response.data;
 
     setAccessToken(access_token);
     if (newRefreshToken) {
-      await saveRefreshToken(newRefreshToken);
+      await saveRefreshTokenForUser(userId, newRefreshToken);
     }
 
     return response.data;
   },
 
   // Đăng xuất
-  async logout(): Promise<void> {
+  async logout(userId?: string): Promise<void> {
     try {
       await api.post("/auth/logout");
       console.log("✅ Logout successful - token invalidated on server");
     } catch (error) {
       console.error("❌ Logout API error:", error);
     } finally {
-      await clearRefreshToken();
+      const resolvedUserId = userId ?? (await getLastUserId());
+      if (resolvedUserId) {
+        await clearRefreshTokenForUser(resolvedUserId);
+      } else {
+        await clearLastUserId();
+      }
       setAccessToken(null);
     }
   },
@@ -365,8 +419,10 @@ export const authApi = {
   },
 
   // Lấy thông tin user hiện tại (GET /auth/profile)
-  async me() {
-    const response = await api.get("/auth/profile");
+  async me(options?: { timeoutMs?: number }) {
+    const response = await api.get("/auth/profile", {
+      timeout: options?.timeoutMs,
+    });
     return response.data;
   },
 
@@ -386,8 +442,8 @@ export const authApi = {
 };
 
 // Helper logout function
-export async function logout() {
-  await authApi.logout();
+export async function logout(userId?: string) {
+  await authApi.logout(userId);
 }
 
 // ============ USERS API ============
@@ -662,7 +718,14 @@ export const taxesApi = {
 // ============ ORDERS API ============
 export const ordersApi = {
   // Get all orders (ADMIN, STAFF)
-  list: async (params?: { status?: string }): Promise<Order[]> => {
+  list: async (params?: {
+    status?: string;
+    tableId?: string;
+    startDate?: string;
+    endDate?: string;
+    paymentMethod?: "cash" | "QR" | "card";
+    createdBy?: string;
+  }): Promise<Order[]> => {
     const response = await api.get("/orders", { params });
     return response.data;
   },
@@ -844,8 +907,8 @@ import type { Recipe, CreateRecipeDto, UpdateRecipeDto } from "../types/api";
 
 export const recipesApi = {
   // Get all recipes
-  list: async (): Promise<Recipe[]> => {
-    const response = await api.get("/recipes");
+  list: async (params?: { search?: string }): Promise<any> => {
+    const response = await api.get("/recipes", { params });
     return response.data;
   },
 

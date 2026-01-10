@@ -65,11 +65,11 @@ export default function App() {
     const restoreSession = async () => {
       try {
         console.log("🔄 Attempting to restore session...");
-        // Thử refresh token để lấy access token mới
-        await authApi.refresh();
+        // Thử refresh token để lấy access token mới (timeout ngắn để không treo app)
+        await authApi.refresh({ timeoutMs: 6000 });
 
         // Nếu refresh thành công, lấy thông tin user qua /auth/profile
-        const userData = await authApi.me();
+        const userData = await authApi.me({ timeoutMs: 6000 });
         console.log("✅ Session restored:", userData);
 
         // Đăng nhập tự động
@@ -112,7 +112,7 @@ export default function App() {
 
   const handleLogout = async () => {
     try {
-      await logout();
+      await logout(currentUser?.id);
     } catch (error) {
       console.error("Logout error:", error);
     } finally {

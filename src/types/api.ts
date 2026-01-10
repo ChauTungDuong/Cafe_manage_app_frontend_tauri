@@ -69,6 +69,7 @@ export interface Order {
   id: string;
   orderCode: string;
   totalAmount: number;
+  ingredientCost?: number;
   status: "pending" | "paid" | "cancelled";
   createdBy: User;
   taxesAndDiscounts: Tax[];
@@ -149,8 +150,6 @@ export interface RecipeIngredient {
 
 export interface Recipe {
   id: string;
-  name: string;
-  description?: string;
   item: Item;
   recipeIngredients: RecipeIngredient[];
   createdAt?: string;
@@ -220,15 +219,12 @@ export interface CreateRecipeIngredientDto {
 }
 
 export interface CreateRecipeDto {
-  name: string;
-  description?: string;
   itemId: string;
   ingredients: CreateRecipeIngredientDto[];
 }
 
 export interface UpdateRecipeDto {
-  name?: string;
-  description?: string;
+  itemId?: string;
   ingredients?: CreateRecipeIngredientDto[];
 }
 
@@ -298,6 +294,8 @@ export interface DailyBreakdown {
   dayOfWeek: number; // 0=Chủ nhật, 1=Thứ hai, ..., 6=Thứ bảy
   dayName: string; // "Thứ hai", "Thứ ba", etc.
   revenue: number; // Doanh thu ngày đó
+  ingredientCost?: number; // Chi nguyên liệu ngày đó
+  grossProfit?: number; // Lợi nhuận gộp ngày đó
   orders: number; // Số đơn hàng
   productsSold: number; // Số sản phẩm bán ra
 }
@@ -309,6 +307,9 @@ export interface Statistic {
   startDate?: string;
   endDate?: string;
   totalRevenue: number;
+  totalIngredientCost?: number;
+  grossProfit?: number;
+  grossMarginPercent?: number;
   totalOrders: number;
   averageOrderValue: number;
   totalProductsSold: number;

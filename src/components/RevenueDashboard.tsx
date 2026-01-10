@@ -27,6 +27,8 @@ import type { Statistic } from "../types/api";
 interface ChartData {
   day: string;
   sales: number;
+  cost: number;
+  profit: number;
   count: number;
 }
 
@@ -137,13 +139,13 @@ export function RevenueDashboard() {
     }
   };
 
-  const handleExportExcel = async () => {
-    if (!autoReport?.id) return;
+  const handleExportExcel = async (report: Statistic | null) => {
+    if (!report?.id) return;
     try {
       setError("");
-      const blob = await statisticsApi.downloadExcel(autoReport.id);
+      const blob = await statisticsApi.downloadExcel(report.id);
 
-      const fileName = `Bao_cao_${autoReport.id}.xlsx`;
+      const fileName = `Bao_cao_${report.id}.xlsx`;
       const isTauri = Boolean(
         (window as any).__TAURI_INTERNALS__ || (window as any).__TAURI__
       );
@@ -196,6 +198,9 @@ export function RevenueDashboard() {
     if (!reportToShow) {
       return {
         totalRevenue: 0,
+        totalIngredientCost: 0,
+        grossProfit: 0,
+        grossMarginPercent: 0,
         totalOrders: 0,
         averageOrderValue: 0,
         totalProductsSold: 0,
@@ -203,6 +208,11 @@ export function RevenueDashboard() {
     }
     return {
       totalRevenue: Number(reportToShow.totalRevenue || 0),
+      totalIngredientCost: Number(
+        (reportToShow as any).totalIngredientCost || 0
+      ),
+      grossProfit: Number((reportToShow as any).grossProfit || 0),
+      grossMarginPercent: Number((reportToShow as any).grossMarginPercent || 0),
       totalOrders: Number(reportToShow.totalOrders || 0),
       averageOrderValue: Number(reportToShow.averageOrderValue || 0),
       totalProductsSold: Number(reportToShow.totalProductsSold || 0),
@@ -228,6 +238,8 @@ export function RevenueDashboard() {
           ? weekdayLabel[d.dayOfWeek] ?? d.dayName ?? d.date
           : d.date,
       sales: Number(d.revenue || 0),
+      cost: Number((d as any).ingredientCost || 0),
+      profit: Number((d as any).grossProfit || 0),
       count: Number(d.orders || 0),
     }));
   }, [reportToShow]);
@@ -343,7 +355,7 @@ export function RevenueDashboard() {
                 />
               </Button>
               <Button
-                onClick={handleExportExcel}
+                onClick={() => handleExportExcel(autoReport)}
                 disabled={!autoReport?.id || loadingAuto}
                 className="bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white"
               >
@@ -429,6 +441,16 @@ export function RevenueDashboard() {
                   Tạo báo cáo
                 </Button>
                 <Button
+                  onClick={() => handleExportExcel(manualReport)}
+                  disabled={
+                    !manualReport?.id || loadingManual || creatingManual
+                  }
+                  className="bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white"
+                >
+                  <FileText className="mr-2 h-4 w-4" />
+                  Xuất Excel
+                </Button>
+                <Button
                   variant="outline"
                   onClick={loadLatestManual}
                   disabled={loadingManual}
@@ -476,13 +498,41 @@ export function RevenueDashboard() {
       </Tabs>
 
       {reportToShow ? (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           <Card className="p-4 border-2 border-orange-100 shadow-lg rounded-2xl">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Tổng doanh thu</p>
                 <p className="text-2xl font-bold">
                   {formatCurrency(summary.totalRevenue)}
+                </p>
+              </div>
+              <DollarSign className="h-8 w-8 text-muted-foreground" />
+            </div>
+          </Card>
+
+          <Card className="p-4 border-2 border-orange-100 shadow-lg rounded-2xl">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Chi nguyên liệu</p>
+                <p className="text-2xl font-bold">
+                  {formatCurrency(summary.totalIngredientCost)}
+                </p>
+              </div>
+              <DollarSign className="h-8 w-8 text-muted-foreground" />
+            </div>
+          </Card>
+
+          <Card className="p-4 border-2 border-orange-100 shadow-lg rounded-2xl">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Lợi nhuận gộp</p>
+                <p className="text-2xl font-bold">
+                  {formatCurrency(summary.grossProfit)}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Biên LN gộp:{" "}
+                  {Number(summary.grossMarginPercent || 0).toFixed(2)}%
                 </p>
               </div>
               <DollarSign className="h-8 w-8 text-muted-foreground" />
@@ -540,10 +590,15 @@ export function RevenueDashboard() {
                       formatter={(value: any, name: any) => {
                         if (name === "sales")
                           return [formatCurrency(value), "Doanh thu"];
+                        if (name === "cost")
+                          return [formatCurrency(value), "Chi nguyên liệu"];
+                        if (name === "profit")
+                          return [formatCurrency(value), "Lợi nhuận gộp"];
                         return [value, "Số đơn"];
                       }}
                     />
                     <Bar dataKey="sales" fill={COLORS[2]} />
+                    <Bar dataKey="cost" fill={COLORS[0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>

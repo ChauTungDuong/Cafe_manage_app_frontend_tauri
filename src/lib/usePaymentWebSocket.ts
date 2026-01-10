@@ -2,7 +2,8 @@ import { useEffect, useRef, useCallback, useState } from "react";
 import { io, Socket } from "socket.io-client";
 import { paymentsApi } from "./api";
 
-const WS_URL = "https://cafe-management-app-backend.onrender.com";
+const WS_URL =
+  import.meta.env.VPS_BACKEND_DOMAIN || "http://103.199.18.103:7000";
 const WS_NAMESPACE = "/payment"; // Payment WebSocket namespace
 
 interface PaymentWebSocketOptions {

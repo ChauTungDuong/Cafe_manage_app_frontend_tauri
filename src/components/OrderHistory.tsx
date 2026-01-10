@@ -28,9 +28,11 @@ import {
   DialogDescription,
 } from "./ui/dialog";
 import { Separator } from "./ui/separator";
-import { ordersApi } from "../lib/api";
+import { ordersApi, tablesApi, usersApi } from "../lib/api";
 import type { Order } from "../types/api";
 import type { User } from "../types/user";
+import type { User as ApiUser, Table } from "../types/api";
+import { formatDateTimeUTC7 } from "../lib/datetime";
 
 interface OrderHistoryProps {
   currentUser?: User | null;
@@ -39,10 +41,17 @@ interface OrderHistoryProps {
 export function OrderHistory({ currentUser }: OrderHistoryProps) {
   // Data state
   const [orders, setOrders] = useState<Order[]>([]);
+  const [tables, setTables] = useState<Table[]>([]);
+  const [users, setUsers] = useState<ApiUser[]>([]);
 
   // UI state
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [tableFilter, setTableFilter] = useState<string>("all");
+  const [paymentMethodFilter, setPaymentMethodFilter] = useState<string>("all");
+  const [createdByFilter, setCreatedByFilter] = useState<string>("all");
+  const [startDateFilter, setStartDateFilter] = useState<string>("");
+  const [endDateFilter, setEndDateFilter] = useState<string>("");
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
 
@@ -50,17 +59,53 @@ export function OrderHistory({ currentUser }: OrderHistoryProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string>("");
 
+  useEffect(() => {
+    const loadLookups = async () => {
+      try {
+        const t = await tablesApi.list();
+        setTables(t);
+      } catch (e) {
+        // ignore
+      }
+
+      if (currentUser?.role === "admin") {
+        try {
+          const u = await usersApi.list();
+          setUsers(u);
+        } catch (e) {
+          // ignore
+        }
+      }
+    };
+    loadLookups();
+  }, [currentUser?.role]);
+
   // Load orders on mount and when filter changes
   useEffect(() => {
     loadOrders();
-  }, [statusFilter]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    statusFilter,
+    tableFilter,
+    paymentMethodFilter,
+    createdByFilter,
+    startDateFilter,
+    endDateFilter,
+  ]);
 
   const loadOrders = async () => {
     setIsLoading(true);
     setError("");
     try {
-      const params =
-        statusFilter !== "all" ? { status: statusFilter } : undefined;
+      const params: any = {};
+      if (statusFilter !== "all") params.status = statusFilter;
+      if (tableFilter !== "all") params.tableId = tableFilter;
+      if (paymentMethodFilter !== "all")
+        params.paymentMethod = paymentMethodFilter;
+      if (createdByFilter !== "all") params.createdBy = createdByFilter;
+      if (startDateFilter) params.startDate = startDateFilter;
+      if (endDateFilter) params.endDate = endDateFilter;
+
       const data = await ordersApi.list(params);
       setOrders(data);
     } catch (err: any) {
@@ -158,16 +203,8 @@ export function OrderHistory({ currentUser }: OrderHistoryProps) {
     }
   };
 
-  // Helper to format dates safely
-  const formatDateTime = (value?: string | null) => {
-    try {
-      const d = value ? new Date(value) : null;
-      if (d && !isNaN(d.getTime())) return d.toLocaleString("vi-VN");
-    } catch (e) {
-      /* ignore */
-    }
-    return "-";
-  };
+  // Helper to format dates safely (UTC+7)
+  const formatDateTime = (value?: string | null) => formatDateTimeUTC7(value);
 
   // Filter orders by search term
   const filteredOrders = orders.filter((order) => {
@@ -185,6 +222,10 @@ export function OrderHistory({ currentUser }: OrderHistoryProps) {
   const totalRevenue = orders
     .filter((o) => o.status === "paid")
     .reduce((sum, order) => sum + order.totalAmount, 0);
+
+  const totalIngredientCost = orders
+    .filter((o) => o.status === "paid")
+    .reduce((sum, order) => sum + Number(order.ingredientCost || 0), 0);
 
   return (
     <div className="space-y-6">
@@ -212,8 +253,8 @@ export function OrderHistory({ currentUser }: OrderHistoryProps) {
       )}
 
       {/* Statistics */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <Card className="p-4 border-2 border-blue-200 bg-blue-50">
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+        <Card className="p-4 border-2 border-blue-200 bg-gradient-to-br from-blue-100 to-blue-200 shadow-lg hover:shadow-xl transition-shadow">
           <p className="text-sm text-blue-700 mb-1">Tổng đơn</p>
           <p className="text-2xl font-bold text-blue-800">{totalOrders}</p>
         </Card>
@@ -233,6 +274,13 @@ export function OrderHistory({ currentUser }: OrderHistoryProps) {
           <p className="text-sm text-orange-700 mb-1">Doanh thu</p>
           <p className="text-xl font-bold text-orange-800">
             {totalRevenue.toLocaleString("vi-VN")}đ
+          </p>
+        </Card>
+
+        <Card className="p-4 border-2 border-amber-200 bg-amber-50">
+          <p className="text-sm text-amber-700 mb-1">Chi nguyên liệu</p>
+          <p className="text-xl font-bold text-amber-800">
+            {totalIngredientCost.toLocaleString("vi-VN")}đ
           </p>
         </Card>
       </div>
@@ -266,6 +314,84 @@ export function OrderHistory({ currentUser }: OrderHistoryProps) {
                 <SelectItem value="cancelled">Đã hủy</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+
+          {/* Table Filter */}
+          <div className="w-[220px]">
+            <Select value={tableFilter} onValueChange={setTableFilter}>
+              <SelectTrigger className="border-orange-200">
+                <SelectValue placeholder="Lọc theo bàn" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tất cả bàn</SelectItem>
+                {tables.map((t) => (
+                  <SelectItem key={t.id} value={t.id}>
+                    {t.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Payment method filter */}
+          <div className="w-[220px]">
+            <Select
+              value={paymentMethodFilter}
+              onValueChange={setPaymentMethodFilter}
+            >
+              <SelectTrigger className="border-orange-200">
+                <SelectValue placeholder="Phương thức TT" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tất cả phương thức</SelectItem>
+                <SelectItem value="cash">💵 Tiền mặt</SelectItem>
+                <SelectItem value="QR">📱 QR Code</SelectItem>
+                <SelectItem value="card">💳 Thẻ</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Creator filter */}
+          <div className="w-[240px]">
+            <Select value={createdByFilter} onValueChange={setCreatedByFilter}>
+              <SelectTrigger className="border-orange-200">
+                <SelectValue placeholder="Người tạo" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tất cả người tạo</SelectItem>
+                {currentUser?.role === "admin" ? (
+                  users.map((u) => (
+                    <SelectItem key={u.id} value={u.id}>
+                      {u.name || u.email}
+                    </SelectItem>
+                  ))
+                ) : (
+                  <SelectItem value={currentUser?.id || "me"}>
+                    Chỉ mình tạo
+                  </SelectItem>
+                )}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Date range filter */}
+          <div className="w-[180px]">
+            <Input
+              type="date"
+              value={startDateFilter}
+              onChange={(e) => setStartDateFilter(e.target.value)}
+              className="border-orange-200 focus:border-orange-400"
+              title="Từ ngày"
+            />
+          </div>
+          <div className="w-[180px]">
+            <Input
+              type="date"
+              value={endDateFilter}
+              onChange={(e) => setEndDateFilter(e.target.value)}
+              className="border-orange-200 focus:border-orange-400"
+              title="Đến ngày"
+            />
           </div>
         </div>
       </Card>
@@ -314,6 +440,15 @@ export function OrderHistory({ currentUser }: OrderHistoryProps) {
                           <span className="text-amber-600">Tổng tiền: </span>
                           <span className="text-orange-600 font-semibold">
                             {order.totalAmount.toLocaleString("vi-VN")}đ
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-amber-600">Chi NL: </span>
+                          <span className="text-amber-900 font-medium">
+                            {Number(order.ingredientCost || 0).toLocaleString(
+                              "vi-VN"
+                            )}
+                            đ
                           </span>
                         </div>
                         <div>
@@ -411,9 +546,7 @@ export function OrderHistory({ currentUser }: OrderHistoryProps) {
                     <div>
                       <span className="text-amber-600">Ngày tạo:</span>
                       <p className="font-semibold text-amber-900">
-                        {new Date(selectedOrder.createdAt).toLocaleString(
-                          "vi-VN"
-                        )}
+                        {formatDateTime(selectedOrder.createdAt)}
                       </p>
                     </div>
                     <div>
@@ -543,6 +676,27 @@ export function OrderHistory({ currentUser }: OrderHistoryProps) {
                           );
                           return subtotal.toLocaleString("vi-VN");
                         })()}
+                        đ
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between text-sm">
+                      <span className="text-amber-700">Chi nguyên liệu:</span>
+                      <span className="text-amber-900 font-medium">
+                        {Number(
+                          selectedOrder.ingredientCost || 0
+                        ).toLocaleString("vi-VN")}
+                        đ
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between text-sm">
+                      <span className="text-amber-700">Lợi nhuận gộp:</span>
+                      <span className="text-amber-900 font-semibold">
+                        {(
+                          Number(selectedOrder.totalAmount || 0) -
+                          Number(selectedOrder.ingredientCost || 0)
+                        ).toLocaleString("vi-VN")}
                         đ
                       </span>
                     </div>

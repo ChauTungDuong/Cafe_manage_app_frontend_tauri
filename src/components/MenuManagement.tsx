@@ -92,13 +92,12 @@ export function MenuManagement({ currentUser }: MenuManagementProps) {
   // State for Recipes Tab (all recipes)
   const [allRecipes, setAllRecipes] = useState<Recipe[]>([]);
   const [isLoadingAllRecipes, setIsLoadingAllRecipes] = useState(false);
+  const [recipeSearchTerm, setRecipeSearchTerm] = useState("");
   const [isRecipeTabFormOpen, setIsRecipeTabFormOpen] = useState(false);
   const [editingRecipeInTab, setEditingRecipeInTab] = useState<Recipe | null>(
     null
   );
   const [recipeTabFormData, setRecipeTabFormData] = useState({
-    name: "",
-    description: "",
     itemId: "",
     ingredients: [] as CreateRecipeIngredientDto[],
   });
@@ -127,8 +126,6 @@ export function MenuManagement({ currentUser }: MenuManagementProps) {
 
   // Recipe form state
   const [recipeFormData, setRecipeFormData] = useState({
-    name: "",
-    description: "",
     ingredients: [] as CreateRecipeIngredientDto[],
   });
 
@@ -221,11 +218,11 @@ export function MenuManagement({ currentUser }: MenuManagementProps) {
   };
 
   // Load all recipes for Recipes tab
-  const loadAllRecipes = async () => {
+  const loadAllRecipes = async (search?: string) => {
     setIsLoadingAllRecipes(true);
     try {
       console.log("📋 Loading all recipes...");
-      const response: any = await recipesApi.list();
+      const response: any = await recipesApi.list({ search });
       console.log("✅ All recipes loaded:", response);
       // Handle both array and object with data property
       const recipesData = Array.isArray(response)
@@ -238,6 +235,15 @@ export function MenuManagement({ currentUser }: MenuManagementProps) {
       setIsLoadingAllRecipes(false);
     }
   };
+
+  useEffect(() => {
+    if (activeTab !== "recipes") return;
+    const handle = window.setTimeout(() => {
+      loadAllRecipes(recipeSearchTerm);
+    }, 300);
+    return () => window.clearTimeout(handle);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recipeSearchTerm, activeTab]);
 
   const handleOpenDialog = (item?: Item) => {
     if (item) {
@@ -444,8 +450,6 @@ export function MenuManagement({ currentUser }: MenuManagementProps) {
     setIsRecipeFormDialogOpen(false);
     setEditingRecipe(null);
     setRecipeFormData({
-      name: "",
-      description: "",
       ingredients: [],
     });
   };
@@ -484,11 +488,6 @@ export function MenuManagement({ currentUser }: MenuManagementProps) {
     if (!selectedItemForRecipe) return;
 
     // Validation
-    if (!recipeFormData.name.trim()) {
-      alert("Vui lòng nhập tên công thức!");
-      return;
-    }
-
     if (recipeFormData.ingredients.length === 0) {
       alert("Vui lòng thêm ít nhất một nguyên liệu!");
       return;
@@ -514,16 +513,12 @@ export function MenuManagement({ currentUser }: MenuManagementProps) {
       if (editingRecipe) {
         // Update existing recipe
         await recipesApi.update(editingRecipe.id, {
-          name: recipeFormData.name,
-          description: recipeFormData.description,
           ingredients: recipeFormData.ingredients,
         });
         alert("Cập nhật công thức thành công!");
       } else {
         // Create new recipe
         await recipesApi.create({
-          name: recipeFormData.name,
-          description: recipeFormData.description,
           itemId: selectedItemForRecipe.id,
           ingredients: recipeFormData.ingredients,
         });
@@ -1522,7 +1517,7 @@ export function MenuManagement({ currentUser }: MenuManagementProps) {
             className="mt-0 bg-white p-6 border-2 border-t-0 border-orange-200 rounded-b-lg space-y-6"
           >
             {/* Header with Add Button */}
-            <div className="flex justify-between items-center">
+            <div className="flex flex-wrap justify-between items-center gap-3">
               <div>
                 <h3 className="text-lg font-semibold text-amber-900">
                   {currentUser?.role === "admin"
@@ -1535,25 +1530,35 @@ export function MenuManagement({ currentUser }: MenuManagementProps) {
                     : "Xem danh sách công thức pha chế cho sản phẩm"}
                 </p>
               </div>
-              {currentUser?.role === "admin" && (
-                <Button
-                  onClick={() => {
-                    setEditingRecipeInTab(null);
-                    setRecipeTabFormData({
-                      name: "",
-                      description: "",
-                      itemId: "",
-                      ingredients: [],
-                    });
-                    loadIngredients(); // Load ingredients when opening form
-                    setIsRecipeTabFormOpen(true);
-                  }}
-                  className="bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Thêm công thức
-                </Button>
-              )}
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="relative w-[280px]">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-amber-600 h-5 w-5" />
+                  <Input
+                    placeholder="Tìm công thức theo tên sản phẩm..."
+                    value={recipeSearchTerm}
+                    onChange={(e) => setRecipeSearchTerm(e.target.value)}
+                    className="pl-10 border-orange-200 focus:border-orange-400"
+                  />
+                </div>
+
+                {currentUser?.role === "admin" && (
+                  <Button
+                    onClick={() => {
+                      setEditingRecipeInTab(null);
+                      setRecipeTabFormData({
+                        itemId: "",
+                        ingredients: [],
+                      });
+                      loadIngredients(); // Load ingredients when opening form
+                      setIsRecipeTabFormOpen(true);
+                    }}
+                    className="bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Thêm công thức
+                  </Button>
+                )}
+              </div>
             </div>
 
             {/* Recipes List */}
@@ -1616,8 +1621,6 @@ export function MenuManagement({ currentUser }: MenuManagementProps) {
                             onClick={async () => {
                               setEditingRecipeInTab(recipe);
                               setRecipeTabFormData({
-                                name: "",
-                                description: "",
                                 itemId: recipe.item?.id || "",
                                 ingredients: recipe.recipeIngredients.map(
                                   (ri) => ({
@@ -1886,7 +1889,6 @@ export function MenuManagement({ currentUser }: MenuManagementProps) {
                       alert("Cập nhật công thức thành công!");
                     } else {
                       await recipesApi.create({
-                        name: recipeTabFormData.name || "",
                         itemId: recipeTabFormData.itemId,
                         ingredients: recipeTabFormData.ingredients,
                       });
@@ -1896,8 +1898,6 @@ export function MenuManagement({ currentUser }: MenuManagementProps) {
                     setIsRecipeTabFormOpen(false);
                     setEditingRecipeInTab(null);
                     setRecipeTabFormData({
-                      name: "",
-                      description: "",
                       itemId: "",
                       ingredients: [],
                     });
@@ -1973,8 +1973,6 @@ export function MenuManagement({ currentUser }: MenuManagementProps) {
                               onClick={async () => {
                                 setEditingRecipeInTab(recipe);
                                 setRecipeTabFormData({
-                                  name: "",
-                                  description: "",
                                   itemId:
                                     recipe.item?.id ||
                                     selectedItemForRecipe?.id ||
@@ -2087,48 +2085,14 @@ export function MenuManagement({ currentUser }: MenuManagementProps) {
                       Thông tin cơ bản
                     </h4>
                     <div className="space-y-5">
-                      {/* Recipe Name */}
                       <div className="space-y-2">
-                        <Label
-                          htmlFor="recipeName"
-                          className="text-sm font-semibold text-amber-800"
-                        >
-                          Tên công thức *
+                        <Label className="text-sm font-semibold text-amber-800">
+                          Món
                         </Label>
                         <Input
-                          id="recipeName"
-                          value={recipeFormData.name}
-                          onChange={(e) =>
-                            setRecipeFormData({
-                              ...recipeFormData,
-                              name: e.target.value,
-                            })
-                          }
-                          placeholder="VD: Công thức Cappuccino truyền thống"
-                          className="bg-orange-50/40 border-orange-200 focus:border-orange-500 focus:ring-orange-500/20 h-11"
-                        />
-                      </div>
-
-                      {/* Recipe Description */}
-                      <div className="space-y-2">
-                        <Label
-                          htmlFor="recipeDescription"
-                          className="text-sm font-semibold text-amber-800"
-                        >
-                          Mô tả công thức
-                        </Label>
-                        <Textarea
-                          id="recipeDescription"
-                          value={recipeFormData.description}
-                          onChange={(e) =>
-                            setRecipeFormData({
-                              ...recipeFormData,
-                              description: e.target.value,
-                            })
-                          }
-                          placeholder="Mô tả chi tiết về công thức, cách pha chế, lưu ý đặc biệt..."
-                          rows={6}
-                          className="bg-orange-50/40 border-orange-200 focus:border-orange-500 focus:ring-orange-500/20 resize-none"
+                          value={selectedItemForRecipe?.name || ""}
+                          disabled
+                          className="bg-orange-50/40 border-orange-200 h-11"
                         />
                       </div>
                     </div>
