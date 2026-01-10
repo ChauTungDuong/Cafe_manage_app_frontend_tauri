@@ -3,7 +3,7 @@ import { Store } from "@tauri-apps/plugin-store";
 
 // Đọc backend URL từ biến môi trường
 const BACKEND_URL =
-  import.meta.env.VPS_BACKEND_DOMAIN || "http://localhost:3000";
+  import.meta.env.VPS_BACKEND_DOMAIN || "http://103.199.18.103:7000";
 
 const REFRESH_TOKEN_KEY_PREFIX = "refresh_token:";
 const LAST_USER_ID_KEY = "last_user_id";
